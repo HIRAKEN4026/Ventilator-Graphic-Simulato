@@ -1,0 +1,3480 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>人工呼吸器グラフィック判読＆介入シミュレーター</title>
+<style>
+  :root {
+    --bg-dark: #0b1120;
+    --panel-bg: #1e293b;
+    --border-col: #334155;
+    --text-main: #f8fafc;
+    --text-sub: #94a3b8;
+    --paw-col: #facc15;
+    --flow-col: #38bdf8;
+    --vol-col: #4ade80;
+    --accent: #3b82f6;
+    --correct: #22c55e;
+    --wrong: #ef4444;
+  }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body {
+    width: 100%;
+    overflow-x: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    line-height: 1.45;
+    font-size: 15px;
+  }
+  body { padding: 10px; }
+
+  .sim-wrapper {
+    max-width: 1600px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .sim-header {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-col);
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .header-top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge-mode {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #fff;
+    border: 1px solid #38bdf8;
+    white-space: nowrap;
+  }
+
+  .controls-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1.3fr 1fr;
+    gap: 10px;
+    align-items: end;
+  }
+  .ctrl-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .ctrl-label {
+    font-size: 0.75rem;
+    color: var(--text-sub);
+    font-weight: 600;
+  }
+  select, button {
+    font-family: inherit;
+    font-size: 0.88rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-col);
+    background: #0f172a;
+    color: #fff;
+    padding: 9px 10px;
+    cursor: pointer;
+    min-height: 40px;
+  }
+  select {
+    width: 100%;
+    text-overflow: ellipsis;
+  }
+
+  .mode-selector-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+  .seg-group {
+    display: flex;
+    background: #0f172a;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid var(--border-col);
+    flex: 1;
+  }
+  .seg-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-sub);
+    font-size: 0.78rem;
+    font-weight: 700;
+    padding: 6px 4px;
+    min-height: 32px;
+    border-radius: 6px;
+    transition: 0.15s;
+    white-space: nowrap;
+  }
+  .seg-btn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+  }
+  .seg-btn.ctrl-active {
+    background: #0d9488;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(13, 148, 136, 0.4);
+  }
+  .seg-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #64748b !important;
+  }
+
+  .ctrl-btn-group {
+    display: flex;
+    gap: 6px;
+  }
+  .ctrl-btn-group button {
+    flex: 1;
+    font-weight: 700;
+    font-size: 0.8rem;
+    padding: 8px 6px;
+    white-space: nowrap;
+  }
+  .btn-resolve {
+    background: #059669;
+    border-color: #10b981;
+  }
+  .btn-resolve.active-overlay {
+    background: #d97706;
+    border-color: #fbbf24;
+  }
+  .btn-resolve:disabled {
+    background: #334155;
+    border-color: #475569;
+    color: #94a3b8;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .sim-grid {
+    display: grid;
+    grid-template-columns: 1.35fr 1fr;
+    gap: 14px;
+    width: 100%;
+    align-items: start;
+  }
+
+  .monitor-panel {
+    background: #030712;
+    border: 2px solid var(--border-col);
+    border-radius: 10px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    overflow: hidden;
+  }
+  .alarm-banner {
+    background: rgba(239, 68, 68, 0.22);
+    border: 1px solid var(--wrong);
+    color: #fca5a5;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    animation: pulse-alarm 1.6s infinite;
+  }
+  .alarm-banner.resolved {
+    background: rgba(34, 197, 94, 0.22);
+    border-color: var(--correct);
+    color: #86efac;
+    animation: none;
+  }
+  .status-sub {
+    font-size: 0.76rem;
+    color: #e2e8f0;
+    font-weight: 600;
+    background: rgba(15, 23, 42, 0.7);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+  @keyframes pulse-alarm {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .vitals-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    background: #111827;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #1f2937;
+    width: 100%;
+  }
+  .vital-box {
+    background: #030712;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    padding: 6px 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 0;
+  }
+  .vital-label {
+    font-size: 0.72rem;
+    color: var(--text-sub);
+    font-weight: 600;
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .vital-val {
+    font-size: clamp(0.95rem, 1.4vw, 1.3rem);
+    font-weight: 800;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 3px 0;
+  }
+  .vital-unit {
+    font-size: 0.68rem;
+    color: var(--text-sub);
+  }
+
+  .canvas-container {
+    width: 100%;
+    height: 440px;
+    position: relative;
+    background: #050811;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .interaction-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+  .visual-card, .quiz-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-col);
+    border-radius: 10px;
+    padding: 12px;
+    width: 100%;
+  }
+  .card-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #e2e8f0;
+    border-bottom: 1px solid var(--border-col);
+    padding-bottom: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+  }
+  .physical-sign-badge {
+    font-size: 0.78rem;
+    color: #38bdf8;
+    font-weight: 600;
+  }
+
+  .patient-svg-wrap {
+    width: 100%;
+    height: 185px;
+    background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+    border-radius: 8px;
+    border: 1px solid var(--border-col);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .level-switch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #0f172a;
+    border: 1px solid var(--border-col);
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .level-label {
+    font-size: 0.78rem;
+    color: #cbd5e1;
+    font-weight: 700;
+  }
+  .level-btn-group {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    min-width: 220px;
+  }
+  .lvl-btn {
+    flex: 1;
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    border-radius: 6px;
+    border: 1px solid var(--border-col);
+    background: #1e293b;
+    color: var(--text-sub);
+    transition: 0.15s;
+  }
+  .lvl-btn.active {
+    background: #8b5cf6;
+    border-color: #a78bfa;
+    color: #fff;
+  }
+
+  .tab-header {
+    display: flex;
+    border-bottom: 2px solid var(--border-col);
+    margin-bottom: 10px;
+    gap: 4px;
+  }
+  .tab-btn {
+    flex: 1;
+    background: #0f172a;
+    border: 1px solid var(--border-col);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    padding: 9px 4px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-sub);
+    text-align: center;
+    min-height: 38px;
+  }
+  .tab-btn.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .tab-badge {
+    display: inline-block;
+    margin-left: 3px;
+    padding: 1px 5px;
+    border-radius: 10px;
+    font-size: 0.68rem;
+    background: rgba(0,0,0,0.35);
+  }
+  .tab-content {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .tab-content.active { display: flex; }
+
+  .option-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #0f172a;
+    border: 1px solid var(--border-col);
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    transition: 0.15s;
+  }
+  .option-item:hover { border-color: #64748b; }
+  .option-item.selected {
+    border-color: var(--accent);
+    background: rgba(59, 130, 246, 0.18);
+  }
+  .option-item.correct-highlight {
+    border-color: var(--correct);
+    background: rgba(34, 197, 94, 0.18);
+  }
+  .option-item.wrong-highlight {
+    border-color: var(--wrong);
+    background: rgba(239, 68, 68, 0.18);
+  }
+  .option-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+
+  .hint-card {
+    background: #0f172a;
+    border: 1px solid var(--border-col);
+    border-left: 4px solid #a855f7;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    color: #e2e8f0;
+  }
+  .hint-card-title {
+    font-weight: 700;
+    color: #c084fc;
+    margin-bottom: 6px;
+    font-size: 0.9rem;
+  }
+
+  .action-bar {
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+  }
+  .btn-intervene {
+    flex: 1;
+    padding: 12px 10px;
+    font-size: 0.92rem;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+    transition: 0.2s;
+  }
+  .btn-intervene:disabled {
+    background: #334155;
+    color: #94a3b8;
+    box-shadow: none;
+    cursor: not-allowed;
+    opacity: 0.75;
+  }
+
+  .feedback-panel {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 8px;
+    background: #0f172a;
+    border: 1px solid var(--border-col);
+    display: none;
+    font-size: 0.85rem;
+  }
+  .feedback-panel.show { display: block; }
+  .fb-header {
+    font-size: 0.96rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .fb-reason-list {
+    margin-top: 6px;
+    padding-left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  @media (max-width: 1100px) {
+    .sim-grid { grid-template-columns: 1fr; }
+    .controls-grid { grid-template-columns: 1fr 1fr; }
+    .controls-grid > .ctrl-box:first-child { grid-column: span 2; }
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 6px; }
+    .controls-grid { grid-template-columns: 1fr; gap: 8px; }
+    .controls-grid > .ctrl-box:first-child { grid-column: span 1; }
+    .mode-selector-group { flex-direction: column; gap: 6px; }
+
+    .vitals-strip {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 5px;
+      padding: 6px;
+    }
+    .vital-box:nth-child(1),
+    .vital-box:nth-child(2),
+    .vital-box:nth-child(3) {
+      grid-column: span 2;
+    }
+    .vital-box:nth-child(4),
+    .vital-box:nth-child(5) {
+      grid-column: span 3;
+    }
+    .vital-val { font-size: 0.92rem; }
+    .canvas-container { height: 320px; }
+    .patient-svg-wrap { height: 160px; }
+    .action-bar { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-wrapper">
+  <header class="sim-header">
+    <div class="header-top">
+      <div class="sim-title">
+        <span>🫁 人工呼吸器グラフィック判読＆介入シミュレーター</span>
+      </div>
+      <span id="ventModeBadge" class="badge-mode">現在設定: A/C - PCV</span>
+    </div>
+
+    <div class="controls-grid">
+      <div class="ctrl-box">
+        <label for="scenarioSelect" class="ctrl-label">▼ 症例波形（全12種）を選択:</label>
+        <select id="scenarioSelect"></select>
+      </div>
+
+      <div class="ctrl-box">
+        <span class="ctrl-label">▼ 換気モード ＆ 制御パターン切替（症例連動）:</span>
+        <div class="mode-selector-group">
+          <div class="seg-group" id="modeSegGroup">
+            <button type="button" class="seg-btn active" data-mode="AC">A/C</button>
+            <button type="button" class="seg-btn" data-mode="SIMV">SIMV</button>
+            <button type="button" class="seg-btn" data-mode="CPAP_PS">CPAP+PSV</button>
+          </div>
+          <div class="seg-group" id="ctrlSegGroup" style="max-width:130px;">
+            <button type="button" class="seg-btn ctrl-active" data-ctrl="PCV">PCV</button>
+            <button type="button" class="seg-btn" data-ctrl="VCV">VCV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ctrl-box">
+        <span class="ctrl-label">▼ 波形比較・再生コントロール:</span>
+        <div class="ctrl-btn-group">
+          <button id="toggleNormalBtn" class="btn-resolve" type="button">正常比較(実線): OFF</button>
+          <button id="pauseWaveBtn" type="button">⏸ 停止</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="sim-grid">
+    <section class="monitor-panel">
+      <div id="alarmBanner" class="alarm-banner">
+        <span id="alarmText">⚠️ 波形異常・非同調を検出</span>
+        <span id="simStatusLabel" class="status-sub">状態: 介入前（異常波形）</span>
+      </div>
+
+      <div class="vitals-strip">
+        <div class="vital-box">
+          <div class="vital-label">Ppeak (最高圧)</div>
+          <div id="valPpeak" class="vital-val" style="color:var(--paw-col);">22</div>
+          <div class="vital-unit">cmH2O</div>
+        </div>
+        <div class="vital-box">
+          <div class="vital-label">PEEP</div>
+          <div id="valPeep" class="vital-val" style="color:var(--paw-col);">5.0</div>
+          <div class="vital-unit">cmH2O</div>
+        </div>
+        <div class="vital-box">
+          <div class="vital-label">EtCO2</div>
+          <div id="valEtco2" class="vital-val" style="color:#f472b6;">38</div>
+          <div class="vital-unit">mmHg</div>
+        </div>
+        <div class="vital-box">
+          <div class="vital-label">VTi / VTe (換気量)</div>
+          <div id="valVt" class="vital-val" style="color:var(--vol-col);">450 / 450</div>
+          <div class="vital-unit">mL</div>
+        </div>
+        <div class="vital-box">
+          <div class="vital-label">fTOT (総呼吸/設定)</div>
+          <div id="valRr" class="vital-val" style="color:var(--flow-col);">15 / 15</div>
+          <div class="vital-unit">回/min</div>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <canvas id="waveCanvas" width="700" height="400"></canvas>
+      </div>
+    </section>
+
+    <section class="interaction-panel">
+      <div class="visual-card">
+        <div class="card-title">
+          <span>🔍 ベッドサイド身体所見・人工呼吸器回路シェーマ</span>
+          <span id="physicalSignText" class="physical-sign-badge"></span>
+        </div>
+        <div class="patient-svg-wrap" id="svgAnimContainer"></div>
+      </div>
+
+      <div class="quiz-card">
+        <div class="level-switch-bar">
+          <span class="level-label">👥 表現・解説レベル切替:</span>
+          <div class="level-btn-group" id="expLevelGroup">
+            <button type="button" class="lvl-btn active" data-level="novice">🌱 新人看護師向け</button>
+            <button type="button" class="lvl-btn" data-level="expert">🎓 5年目以上向け</button>
+          </div>
+        </div>
+
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="causeTab" type="button">
+            発生要因 <span id="badgeCause" class="tab-badge">未選択</span>
+          </button>
+          <button class="tab-btn" data-tab="actionTab" type="button">
+            対処法 <span id="badgeAction" class="tab-badge">未選択</span>
+          </button>
+          <button class="tab-btn" data-tab="hintTab" type="button">
+            💡 ヒント
+          </button>
+        </div>
+
+        <div id="causeTab" class="tab-content active"></div>
+        <div id="actionTab" class="tab-content"></div>
+
+        <div id="hintTab" class="tab-content">
+          <div class="hint-card">
+            <div id="hintLevelTitle" class="hint-card-title">🌱 新人看護師向け：波形の見かたヒント</div>
+            <p id="hintFeatureText"></p>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button id="interveneBtn" class="btn-intervene" type="button" disabled>
+            🔒 「発生要因」と「対処法」を選択すると介入できます
+          </button>
+          <button id="resetQuizBtn" type="button">🔄 リセット</button>
+        </div>
+
+        <div id="feedbackPanel" class="feedback-panel"></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const SCENARIOS_PART1 = [
+  {
+    id: "1-1",
+    category: "1. トリガー関連の非同調",
+    title: "① ミストリガー（Missed Trigger）",
+    defaultMode: "AC", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "⚠️ 換気回数低下傾向 / 吸気補助筋使用・シーソー呼吸",
+    physicalSign: "胸郭・横隔膜が吸気努力で動くが、送気が開始されない箇所あり",
+    vitals: { ppeak: 18, peep: "5.0", vti: 450, vte: 450, rr: "12/12(努24)", etco2: 46 },
+    hintNovice: "患者さんが息を吸おうとして胸やお腹が動いているのに、呼吸器が気づいていない状態です。息を吐いている途中の水色の線（流量波形）がポコッと上に膨らんだり、黄色の線（圧波形）が下にへこんだりしているのに、次の送気の山が始まらないのが特徴です。",
+    hintExpert: "呼気相の流量波形に“上に凸”の小さなサインカーブ、気道内圧波形に“下に凸”の陰圧陥凹（吸気努力）が出現しているにもかかわらず、トリガー閾値に達せず機械送気が開始されない無効吸気努力（Ineffective Effort）の波形です。",
+    animType: "missed_trigger",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "呼吸器が「息を吸い始めた」と気づくための感度（トリガー感度）が鈍すぎる",
+        textExpert: "吸気トリガー感度（圧・フロートリガー閾値）の設定が鈍すぎる",
+        reason: "トリガー閾値に患者の吸気努力が届かず、人工呼吸器が自発呼吸を感知できていません。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "鎮静薬が効きすぎている、または呼吸する筋肉が疲れていて吸う力が弱い",
+        textExpert: "過鎮静や呼吸筋疲労・神経筋疾患による自発吸気ドライブ・吸気筋力の減弱",
+        reason: "吸気フローや陰圧変化が小さくなると、設定感度に達していません。"
+      },
+      {
+        id: "c3", isCorrect: true,
+        textNovice: "前の息が肺の中に残っていて（オートPEEP）、新しく息を吸い込みにくい",
+        textExpert: "内因性PEEP（Auto-PEEP）の残存により、トリガーに必要な吸気仕事量が増大している",
+        reason: "肺胞内の残存陽圧を打ち消すだけの余分な吸気努力が必要となり、トリガー不全を起こします。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "トリガー感度が敏感すぎる、またはホースの中の水滴が揺れている",
+        textExpert: "トリガー感度の過敏設定および呼吸回路内の結露水による心原性・機械的振動",
+        reason: "感度過敏や結露水の揺れは「オートトリガー」の原因です。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "空気を送り出す時間が長すぎて、息を吐く時間が足りなくなっている",
+        textExpert: "設定吸気時間（TI）が長すぎることによる送気の終了遅延",
+        reason: "吸気時間が長すぎる場合は吸気終末のプレッシャースパイクを引き起こします。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "呼吸器の感度を調整して、弱い息でもすぐ反応できるようにする（フロートリガー等）",
+        textExpert: "圧トリガーからフロートリガー（1〜2 L/min）へ変更し、適切な感度鋭敏化を行う",
+        reason: "弱い吸気努力でも少ない呼吸仕事量でトリガーできるように調整します。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "眠りすぎ（過鎮静）のときは鎮静薬を減らして、自分でしっかり息を吸えるようにする",
+        textExpert: "RASS目標値を再評価し、過鎮静であれば鎮静薬を減量・中断して自発吸気努力を回復させる",
+        reason: "過鎮静を解除して患者自身の有効な吸気ドライブを促します。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "息を吐き切れていない時は、呼吸回数を減らして吐く時間を長くするか、外から少し圧（PEEP）をかける",
+        textExpert: "換気回数・吸気時間を減らして呼気時間を確保し、カウンターPEEPを付加する",
+        reason: "エアトラッピングを減らし、肺胞内圧と回路内圧の圧較差を縮めてトリガーしやすくします。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "トリガーの数値を上げて、さらに反応しにくくする",
+        textExpert: "フロートリガー閾値を5.0 L/min以上へ引き上げる",
+        reason: "感度を鈍くするとさらに自発呼吸が感知されなくなります。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "1回に送る空気の量を今の2倍に増やして、呼吸の回数も増やす",
+        textExpert: "設定一回換気量（VT）および設定換気回数を現在の2倍へ増量する",
+        reason: "換気量を増やすと呼気時間がさらに短縮し、オートPEEPが増悪します。"
+      }
+    ]
+  },
+  {
+    id: "1-2",
+    category: "1. トリガー関連の非同調",
+    title: "② オートトリガー（Auto-Triggering）",
+    defaultMode: "AC", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "🚨 呼吸回数上限アラーム（fTOT 28回/min） / 過換気リスク",
+    physicalSign: "自発吸気努力（胸郭運動）がないのに補助換気が頻回に作動・回路に水滴",
+    vitals: { ppeak: 18, peep: "5.0", vti: 450, vte: 440, rr: "28 / 12", etco2: 26 },
+    hintNovice: "患者さんは自分で息を吸っていないのに、呼吸器が「息を吸った！」と勘違いして、勝手に次々と空気を送ってしまっている状態です。波形の線が細かく揺れていて、設定した呼吸の回数よりもたくさんの山ができているのが特徴です。",
+    hintExpert: "患者の吸気努力がないにもかかわらず、回路内結露水の揺れや心原性振動、リークによるベースフロー変化を吸気と誤認し、設定換気回数を超えて補助換気が頻回にトリガーされる波形です。",
+    animType: "auto_trigger",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "呼吸器が息の吸い始めを感知する設定（トリガー感度）が敏感すぎる",
+        textExpert: "吸気トリガー感度の設定が鋭敏すぎる",
+        reason: "わずかな気流や圧の揺らぎを自発吸気と誤認して送気を開始してしまいます。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "ホース（回路）の中に溜まった水滴や痰が揺れている",
+        textExpert: "呼吸回路内の結露水貯留や気管分泌物の揺れ",
+        reason: "回路内の水溜まりや分泌物の振動がセンサーに感知され、誤トリガーを誘発します。"
+      },
+      {
+        id: "c3", isCorrect: true,
+        textNovice: "空気の漏れ（エアリーク）がある、または心臓の拍動がホースに伝わっている",
+        textExpert: "回路・カフからのエアリーク、または心原性振動（Cardiogenic oscillation）の伝播",
+        reason: "リークによるベースフローの損失や心拍動による圧変動がトリガー閾値を超えてしまいます。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "空気を送るスピード（吸気流量）が足りなくて患者さんが苦しがっている",
+        textExpert: "患者の吸気流量要求に対する設定ピークフローの不足（Flow Starvation）",
+        reason: "フロー不足はサギングの原因であり、オートトリガーの原因ではありません。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "鎮静薬が効きすぎていて、自分の呼吸がまったくなくなっている",
+        textExpert: "過鎮静による完全な自発呼吸の消失",
+        reason: "自発呼吸消失はミストリガーの原因となります。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "ホースの水抜き（排液）を行い、痰があれば吸引して取り除く",
+        textExpert: "呼吸回路のウォータートラップから結露水を排液し、気管内吸引を実施する",
+        reason: "誤トリガーの発生源となっている水滴の揺れや喀痰を物理的に取り除きます。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "カフの空気圧を直して、回路のつなぎ目の緩みや空気漏れを直す",
+        textExpert: "カフ圧を適正化（20〜30 cmH2O）し、回路接続部の緩みやエアリークを修正する",
+        reason: "回路内圧低下やフロー流出を止めることでオートトリガーを防ぎます。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "心臓の拍動やノイズを拾わないように、トリガー感度を少し鈍いほうへ調整する",
+        textExpert: "ノイズを拾わない適切なレベル（フロートリガー2〜3 L/min等）へトリガー感度を鈍化させる",
+        reason: "ノイズを拾わず、かつ本当の自発吸気は感知できる適切な感度閾値へ再設定します。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "トリガー感度をさらに敏感（0.5 L/min）にして、もっと反応しやすくする",
+        textExpert: "フロートリガー感度を0.5 L/min以下へ鋭敏化する",
+        reason: "振動ノイズをさらに拾いやすくなり、オートトリガーが激化します。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "1回に送る空気の量を今の2倍に増やす",
+        textExpert: "設定一回換気量（VT）を現在の2倍へ増量する",
+        reason: "過換気と肺損傷を招くだけであり、オートトリガーの解決にはなりません。"
+      }
+    ]
+  },
+  {
+    id: "1-3",
+    category: "1. トリガー関連の非同調",
+    title: "③ ダブルトリガー（Double Trigger / 二段呼吸）",
+    defaultMode: "AC", defaultCtrl: "VCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "🚨 気道内圧上限アラーム（Ppeak 39） / 一回換気量過大（約2倍）",
+    physicalSign: "1回目の送気終了後も患者の吸気努力が続き、直後に2回目の送気が連続流入",
+    vitals: { ppeak: 39, peep: "8.0", vti: 780, vte: 760, rr: "26 / 15", etco2: 34 },
+    hintNovice: "患者さんが「もっとたくさん息を吸いたい！」と思っているのに、呼吸器の送気が早く終わってしまったため、息を吐く前にすぐ2回目の送気が連続で入ってしまっている（二段呼吸）状態です。1回で2回分の空気が入るため、肺が膨らみすぎて危険です。",
+    hintExpert: "1回目の機械送気が終了した直後、呼気が完了する前に持続する患者の吸気努力によって間髪入れず2回目の送気がトリガーされる波形です。設定値の約2倍の一回換気量と過大な気道内圧が生じ、VILIのリスクが高まります。",
+    animType: "double_trigger",
+    causes: [
+      {
+        id: "c1", isCorrect: true, applicableModes: ["AC", "SIMV"],
+        textNovice: "呼吸器が空気を送る時間（吸気時間）が、患者さんの吸いたい時間より短すぎる",
+        textExpert: "設定吸気時間（TI）が患者の神経学的吸気時間に対して短すぎる（送気の早期終了）",
+        reason: "機械の送気が先に終わっても患者が吸い続けているため、直後に2回目をトリガーします。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "1回に送る空気の量（一回換気量）が、患者さんの求めている量より少なすぎる",
+        textExpert: "設定一回換気量（VT）や吸気流量が、患者の強い呼吸要求に対して不足している",
+        reason: "換気量不足で吸気努力が持続し、連続送気（Breath Stacking）を引き起こします。"
+      },
+      {
+        id: "c3", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"],
+        textNovice: "プレッシャーサポート（PSV）で、息の終わりを決める設定（サイクルオフ）が高すぎて早く切り替わっている",
+        textExpert: "PSVにおける呼気トリガー感度（サイクルオフ／Esens）の設定値が高すぎる",
+        reason: "早期に呼気へ切り替わることで吸気努力が残存し、二段呼吸となります。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "気管チューブから空気がたくさん漏れて、圧力が保てない",
+        textExpert: "気管チューブのカフ破損による大量のエアリーク",
+        reason: "大量リークでは換気量波形が基線に戻らなくなりますが、二段呼吸の主因ではありません。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "呼吸器の感度が敏感すぎて、心臓の拍動を拾っている",
+        textExpert: "吸気トリガー感度が過敏すぎる設定によるオートトリガー",
+        reason: "感度過敏はオートトリガーの原因であり、ダブルトリガーではありません。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true, applicableModes: ["AC", "SIMV"], altGroup: "dt_act",
+        textNovice: "空気を送る時間（吸気時間）を少し延ばすか、1回に送る空気の量を調整する",
+        textExpert: "PCVでは設定吸気時間（TI）を延長し、VCVでは許容範囲内で一回換気量（VT）や吸気時間を調整する",
+        reason: "患者の吸気努力が終わるまで送気サポートを維持し、1回の換気で満足させます。"
+      },
+      {
+        id: "a2", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"], altGroup: "dt_act",
+        textNovice: "PSVモードなら、サイクルオフの％を下げて（25%→10%など）、長くサポートが続くようにする",
+        textExpert: "PSVではサイクルオフ感度（Esens）を25%から5〜10%へ下げて吸気サポート時間を延長する",
+        reason: "吸気流量が十分下がるまでサポートを継続させ、早期打ち切りを防ぎます。"
+      },
+      {
+        id: "a3", isCorrect: true, altGroup: "dt_act",
+        textNovice: "重症の肺炎等でこれ以上空気を増やせない時は、鎮痛・鎮静を強めるか筋弛緩薬を使って激しい呼吸を抑える",
+        textExpert: "重症ARDS等の肺保護換気中でVT増量を許容できない場合は、鎮痛・鎮静の強化や筋弛緩薬で呼吸ドライブを抑制する",
+        reason: "超急性期ARDSで2倍の換気量が入るのを防ぐため、患者側の強い吸気努力をコントロールします。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "空気を送る時間（吸気時間）を今よりさらに短くする",
+        textExpert: "設定吸気時間（TI）を現在よりさらに短縮する",
+        reason: "送気の早期終了がさらに悪化し、ダブルトリガーが頻発します。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "プレッシャーサポートのサイクルオフ感度を50%に上げて、すぐに息を吐かせる",
+        textExpert: "PSVのサイクルオフ感度（Esens）を50%へ引き上げる",
+        reason: "吸気サポートがさらに早く打ち切られるため、二段呼吸が悪化します。"
+      }
+    ]
+  },
+  {
+    id: "1-4",
+    category: "1. トリガー関連の非同調",
+    title: "④ リバーストリガー（Reverse Trigger）",
+    defaultMode: "AC", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "⚠️ 高一回換気量アラーム / 強制換気直後の二段呼吸",
+    physicalSign: "深鎮静下（RASS -4〜-5）、強制換気の送気開始から遅れて横隔膜が収縮",
+    vitals: { ppeak: 24, peep: "5.0", vti: 580, vte: 580, rr: "20 / 20", etco2: 36 },
+    hintNovice: "深い鎮静で眠っている患者さんに、呼吸器が強制的に空気を送ったあと、その刺激につられて患者さんの横隔膜が遅れて動き出し、もう1回分の空気を引き込んでしまう現象です（強制換気があるA/CやSIMVで起こり、自発モードのCPAP+PSVでは起こりません）。",
+    hintExpert: "深鎮静下で人工呼吸器の強制送気（時間トリガー）による受動的な肺膨張刺激が呼吸中枢・横隔膜の反射的収縮を誘発（Entrainment）し、吸気後半の圧陥凹・流量二峰性や2回目の連続送気（ダブルトリガー）を引き起こす波形です。",
+    animType: "reverse_trigger",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "深く眠っている状態で、呼吸器から強制的に空気が送られた刺激によって、後から横隔膜が反射的に動いてしまう",
+        textExpert: "深鎮静下での機械的強制送気（受動的肺伸展）が呼吸中枢・横隔膜の反射的収縮を誘発している",
+        reason: "機械換気のリズムに患者の横隔膜収縮が引き込まれることで発生します。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "鎮静薬が効きすぎている、かつ呼吸器の強制換気の回数が多く設定されている",
+        textExpert: "自発呼吸が抑制されるほどの過鎮静と、過剰な設定強制換気回数",
+        reason: "深鎮静と強制換気の組み合わせがリバーストリガーの典型的な発生背景です。"
+      },
+      {
+        id: "c3", isCorrect: false,
+        textNovice: "気管チューブから空気が漏れている",
+        textExpert: "気管チューブのカフ圧不足によるエアリーク",
+        reason: "リークは換気量波形が基線に戻らない異常であり、リバーストリガーの原因ではありません。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "ホースのつなぎ目が外れかかっている",
+        textExpert: "呼吸回路接続部の緩み",
+        reason: "接続部の緩みはエアリークの原因です。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "トリガー感度が敏感すぎて心音を拾っている",
+        textExpert: "吸気トリガー感度の過敏設定によるオートトリガー",
+        reason: "感度過敏はオートトリガーの原因です。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true, altGroup: "rev_act",
+        textNovice: "患者さんの状態が安定していれば、鎮静薬を減らして自分の呼吸を取り戻させる",
+        textExpert: "全身状態が許容すれば鎮静薬を減量して深鎮静状態を脱し、患者自身の自発呼吸ドライブを促す",
+        reason: "患者自身の自発呼吸リズムを回復させることで、強制換気による逆行性誘発を解消します。"
+      },
+      {
+        id: "a2", isCorrect: true, altGroup: "rev_act",
+        textNovice: "呼吸器が決める強制換気の回数を減らして、患者さん自身の呼吸のタイミングを優先させる",
+        textExpert: "設定強制換気回数（f）を減量し、患者自身の自発トリガーサイクルを優先させる",
+        reason: "機械からの強制送気刺激を減らし、患者主体の呼吸へ移行させます。"
+      },
+      {
+        id: "a3", isCorrect: true, altGroup: "rev_act",
+        textNovice: "重症肺炎（ARDS）で肺を絶対に守りたい時期なら、一時的に筋弛緩薬を使って横隔膜の反射的な動きを止める",
+        textExpert: "重症ARDS超急性期で二段呼吸によるVILIを防ぐ必要がある場合は、筋弛緩薬の投与で横隔膜収縮を抑制する",
+        reason: "肺保護が最優先される局面では、筋弛緩薬で横隔膜の反射的収縮を止めます。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "深く眠らせたまま、呼吸器の強制換気の回数を今よりさらに増やす",
+        textExpert: "深鎮静を維持したまま設定強制換気回数を増量する",
+        reason: "強制送気の頻度が増え、リバーストリガーを助長します。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "カフの空気を全部抜いて、隙間を作る",
+        textExpert: "カフ圧を完全に脱気して減圧する",
+        reason: "誤嚥や低換気を招く危険な操作であり、リバーストリガーの対策にはなりません。"
+      }
+    ]
+  },
+  {
+    id: "2-1",
+    category: "2. 送気流量・相移行の非同調",
+    title: "① サギング（Sagging / Flow Starvation）",
+    defaultMode: "AC", defaultCtrl: "VCV",
+    allowedModes: ["AC", "SIMV"],
+    allowedCtrls: ["VCV"],
+    alarm: "⚠️ 強い吸気努力（陥没呼吸・補助筋使用） / 気道内圧波形の陥凹",
+    physicalSign: "吸気時に胸鎖乳突筋が緊張し、吸い足りず苦悶様の表情",
+    vitals: { ppeak: 16, peep: "5.0", vti: 400, vte: 400, rr: "22 / 15", etco2: 39 },
+    hintNovice: "量を決めて送るモード（VCV）では、空気が出るスピード（流量）が一定に固定されています。患者さんが「もっと勢いよく吸いたい！」と強く息を吸うと、呼吸器の送るスピードが追いつかず、黄色の線（圧波形）の真ん中がグッと下にへこんでしまいます（サギング＝垂れ下がり）。",
+    hintExpert: "流量固定のVCVモードにおいて、設定吸気流量が患者の強い吸気要求流速を下回るため（Flow Starvation）、吸気相中央の気道内圧波形が胸腔内陰圧に引かれてM字型・船底型に大きく陥凹する波形です。呼吸仕事量の著明な増大とP-SILIを招きます。",
+    animType: "sagging",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "VCVモードで決められた「空気を送るスピード（吸気流量）」が、患者さんの吸いたいスピードより遅くて足りない",
+        textExpert: "VCVにおいて固定設定された吸気流量（フロー）が、患者の強い吸気要求流速に対して不足している",
+        reason: "設定流速以上に患者が強く息を吸うため、回路内が陰圧側に引かれて圧波形が凹みます。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "痛みや熱、息苦しさなどで、患者さんが「強く・速く息を吸いたい」状態になっている",
+        textExpert: "疼痛、発熱、代謝性アシドーシスや覚醒に伴う中枢性吸気ドライブの亢進",
+        reason: "患者の要求フローが増大し、固定流量では追いつかなくなります。"
+      },
+      {
+        id: "c3", isCorrect: false,
+        textNovice: "気管チューブが痰で詰まっていて、空気が通りにくくなっている",
+        textExpert: "気管チューブ内の分泌物閉塞による気道抵抗の著明な上昇",
+        reason: "チューブ閉塞では最高気道内圧が急上昇し、下に凹むサギングにはなりません。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "トリガー感度が鈍すぎて、患者さんの吸い始めに気づけていない",
+        textExpert: "吸気トリガー感度の設定不良によるミストリガー",
+        reason: "サギングはトリガーされた後の「吸気相途中」における送気流量不足の非同調です。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "呼吸器のホースの中に水が溜まってポコポコ揺れている",
+        textExpert: "呼気回路およびウォータートラップ内の結露水貯留",
+        reason: "結露水はノコギリ状のギザギザ波形やオートトリガーの原因です。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true, altGroup: "sag_mode",
+        textNovice: "患者さんの吸う勢いに合わせて空気のスピードが自動で変わるモード（PCVやPSV）に変更する",
+        textExpert: "患者の吸気努力に応じて吸気流量が可変増加する圧制御モード（PCVまたはPSV）へ変更する",
+        reason: "PCVやPSVに切り替えることで、患者が求める流速でガスが供給されサギングが解消します。"
+      },
+      {
+        id: "a2", isCorrect: true, altGroup: "sag_mode",
+        textNovice: "VCVモードを続ける場合は、空気を送るスピード（ピークフロー）を速くするか、漸減波に変える",
+        textExpert: "VCVを維持する場合は、設定ピークフローを引き上げるか、流量波形を漸減波へ変更する",
+        reason: "吸気初期〜中期の送気スピードを上げることで流量不足を補います。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "痛みや熱、不安など、患者さんが激しく息を吸わなければいけない原因があれば取り除く",
+        textExpert: "疼痛・発熱・アシドーシスなど過剰な呼吸ドライブの原因を検索し、適切な鎮痛・原因治療を行う",
+        reason: "過剰な吸気要求そのものを和らげることで呼吸仕事量を軽減できます。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "VCVモードのまま、空気を送るスピード（吸気流量）を今よりさらに遅くする",
+        textExpert: "VCVのまま設定ピークフローを減量する",
+        reason: "流速不足がさらに深刻化し、呼吸仕事量増大とP-SILIを招きます。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "PEEPの設定を0 cmH2Oに下げる",
+        textExpert: "PEEP設定を5 cmH2Oから0 cmH2Oへ変更する",
+        reason: "PEEPをゼロにしても吸気流速不足は解決しません。"
+      }
+    ]
+  },
+  {
+    id: "2-2",
+    category: "2. 送気流量・相移行の非同調",
+    title: "② 送気の早期終了（Premature Cycling）",
+    defaultMode: "AC", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "⚠️ 吸気終了直後の吸気努力残存 / ダブルトリガー予備軍",
+    physicalSign: "送気が止まった直後も、患者の胸郭がさらに広がろうとする動きあり",
+    vitals: { ppeak: 18, peep: "5.0", vti: 380, vte: 380, rr: "18 / 15", etco2: 41 },
+    hintNovice: "患者さんは「まだ息を吸い続けている」のに、呼吸器が「もう吸気時間は終わり！」と途中で送気を打ち切ってしまった波形です。息を吐く側（下側）に切り替わった直後の水色の線（流量波形）が、患者さんの吸い残しの力でグッと上向きに引っ張られているのが目印です。",
+    hintExpert: "機械の設定吸気時間（TI）が患者の神経学的吸気時間より短いため、吸気流量がゼロに戻る前に呼気へ切り替わり、呼気相直後の流量波形に“上に凸”の吸気努力残存が出現する波形です。",
+    animType: "premature_cycling",
+    causes: [
+      {
+        id: "c1", isCorrect: true, applicableModes: ["AC", "SIMV"],
+        textNovice: "呼吸器が空気を送る時間（設定吸気時間）が、患者さんが実際に息を吸っている時間よりも短い",
+        textExpert: "人工呼吸器の設定吸気時間（TI）が、患者自身の神経学的吸気時間よりも短く設定されている",
+        reason: "患者がまだ息を吸っている途中で送気が打ち切られるため、呼気相初期に吸気努力が残ります。"
+      },
+      {
+        id: "c2", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"],
+        textNovice: "プレッシャーサポート（PSV）で、送気を終える基準（サイクルオフ感度）が高すぎる",
+        textExpert: "PSVにおけるサイクルオフ感度（Esens）の設定値が高すぎる",
+        reason: "吸気流量がまだ高い段階で呼気へ切り替わってしまうため、吸い足りない状態になります。"
+      },
+      {
+        id: "c3", isCorrect: false,
+        textNovice: "患者さんがすでに息を吐き始めているのに、呼吸器がまだ空気を送り続けている",
+        textExpert: "患者の神経学的吸気終了後も機械送気が継続している",
+        reason: "それは「送気の終了遅延」の原因です。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "気管チューブが折れ曲がって、息を吐くのに時間がかかっている",
+        textExpert: "気管チューブの屈曲による呼気気道抵抗の増大",
+        reason: "チューブ屈曲は気道抵抗上昇の原因です。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "トリガー感度が敏感すぎて心音を拾っている",
+        textExpert: "吸気トリガー感度の過敏設定によるオートトリガー",
+        reason: "感度過敏はオートトリガーの原因です。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true, applicableModes: ["AC", "SIMV"],
+        textNovice: "PCVモードでは、呼気直後の波形の跳ね上がり（上に凸）が消えるまで、吸気時間を少し長くする",
+        textExpert: "PCVでは吸気流量波形が基線付近に戻り呼気直後の凸波形が消失するまで、設定吸気時間（TI）を延長する",
+        reason: "患者の神経学的吸気時間に合わせて送気時間を延ばすことで同調性が改善します。"
+      },
+      {
+        id: "a2", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"],
+        textNovice: "PSVモードでは、サイクルオフ感度の％を下げて（25%→10%など）、最後までしっかりサポートが続くようにする",
+        textExpert: "PSVではサイクルオフ感度（Esens）の設定値を小さく変更し、吸気時間を延長させる",
+        reason: "より遅いタイミングまで吸気サポートが維持され、早期終了を防ぎます。"
+      },
+      {
+        id: "a3", isCorrect: false,
+        textNovice: "PCVモードの設定吸気時間を今よりさらに短くする",
+        textExpert: "PCVの設定吸気時間（TI）を現在よりさらに短縮する",
+        reason: "送気がさらに早く打ち切られ、ダブルトリガーを誘発します。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "PSVモードのサイクルオフ感度を50%に上げる",
+        textExpert: "PSVのサイクルオフ感度（Esens）を50%へ引き上げる",
+        reason: "吸気サポートがさらに早く打ち切られるため、二段呼吸が悪化します。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "酸素濃度（FiO2）を100%に上げる",
+        textExpert: "FiO2を1.0へ引き上げる",
+        reason: "酸素濃度を上げても吸気時間のミスマッチは解決しません。"
+      }
+    ]
+  }
+];
+</script>
+<script>
+/**
+ * 全12症例データベース（後半：症例7〜12）＆ 配列結合
+ */
+const SCENARIOS_PART2 = [
+  {
+    id: "2-3",
+    category: "2. 送気流量・相移行の非同調",
+    title: "③ 送気の終了遅延（Delayed Cycling）",
+    defaultMode: "CPAP_PS", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "⚠️ 気道内圧上限傾向 / 吸気終末のプレッシャースパイク",
+    physicalSign: "送気の後半で患者が息を吐こうとして腹直筋（呼気補助筋）を収縮",
+    vitals: { ppeak: 26, peep: "5.0", vti: 500, vte: 500, rr: "16 / 12", etco2: 40 },
+    hintNovice: "患者さんは「もう吸い終わったから息を吐きたい！」と思っているのに、呼吸器がまだ空気を送り続けているため、吸い終わりのところで患者さんの吐く息と機械の送気がぶつかって、黄色の線（圧波形）の最後がツノのようにピッと鋭く跳ね上がっている（プレッシャースパイク）波形です。",
+    hintExpert: "患者が既に吸気を終えて呼気（Active exhalation）を開始しているにもかかわらず人工呼吸器の送気が持続し、吸気終末に気道内圧が一過性に鋭く跳ね上がる「プレッシャースパイク」を呈する波形です。COPD患者でのPSV管理時や過大な吸気時間設定で好発します。",
+    animType: "delayed_cycling",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "患者さんがすでに息を吐き始めているのに、呼吸器がまだ空気を送り続けている",
+        textExpert: "患者の神経学的吸気終了後も機械送気が継続し、患者の呼気努力と衝突している",
+        reason: "送気と患者の呼気努力が吸気終末でぶつかり、気道内圧がスパイク状に跳ね上がります。"
+      },
+      {
+        id: "c2", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"],
+        textNovice: "COPDなどで空気の通り道が狭いため、PSVで空気の勢い（流量）がなかなか落ちず、送気が終われない",
+        textExpert: "気管支喘息・COPD等の気道抵抗上昇により、PSVでの吸気流量減衰が遅れている",
+        reason: "時定数が長い閉塞性肺疾患では吸気流量がゆっくりとしか低下せず、送気終了が遅延しやすくなります。"
+      },
+      {
+        id: "c3", isCorrect: true,
+        textNovice: "プレッシャーサポートの圧が高すぎる、または空気を送る時間が長すぎる",
+        textExpert: "PSVのサポート圧設定が過剰である、またはPCVの設定吸気時間が長すぎる",
+        reason: "過大なサポート圧や長すぎる吸気時間設定が送気終了を遅らせます。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "呼吸器が空気を送る時間が、患者さんの吸いたい時間より短すぎる",
+        textExpert: "設定吸気時間（TI）が患者の神経学的吸気時間よりも短すぎる",
+        reason: "吸気時間が短すぎる場合は「送気の早期終了」となります。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "トリガー感度が鈍すぎて、患者さんの吸い始めを感知できていない",
+        textExpert: "吸気トリガー感度の設定不良によるミストリガー",
+        reason: "トリガー不全はミストリガーの原因です。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"],
+        textNovice: "PSVモードでは、送気を終える基準（サイクルオフ感度）を大きくして（25%→45%など）、早めに息を吐けるようにする",
+        textExpert: "PSVではサイクルオフ感度（Esens）を大きく設定し（例：25%→45〜50%）、早期に呼気相へ移行させる",
+        reason: "COPD患者などでも患者の呼気開始に合わせてスムーズに送気を終了できます。"
+      },
+      {
+        id: "a2", isCorrect: true, applicableModes: ["AC", "SIMV"],
+        textNovice: "PCVモードでは、圧波形の最後のツノ（スパイク）やお腹の緊張が消えるように、吸気時間を短くする",
+        textExpert: "PCVではプレッシャースパイクおよび呼気補助筋の収縮が消失するまで設定吸気時間（TI）を短縮する",
+        reason: "患者の吸気終了タイミングに合わせて送気時間を短くすることで、呼気との衝突を防ぎます。"
+      },
+      {
+        id: "a3", isCorrect: true, applicableModes: ["SIMV", "CPAP_PS"],
+        textNovice: "プレッシャーサポートの圧が高すぎる場合は、患者さんの状態を見ながらサポート圧を少し下げる",
+        textExpert: "PSVのサポート圧が過剰な場合は、一回換気量と呼吸仕事量を評価しながらサポート圧を減量する",
+        reason: "過剰な圧サポートを適正化することで、送気時間の延長と送気終了遅延が改善します。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "PSVのサイクルオフ感度を5%に下げる、またはPCVの吸気時間をもっと長く延ばす",
+        textExpert: "PSVのサイクルオフ感度を5%へ引き下げる、またはPCVの吸気時間を延長する",
+        reason: "さらに送気時間が長引き、ファイティングとオートPEEPが悪化します。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "トリガー感度を一番鈍い設定に変える",
+        textExpert: "吸気トリガー感度を極端に鈍化させる",
+        reason: "送気終了遅延の解決にはなりません。"
+      }
+    ]
+  },
+  {
+    id: "3-1",
+    category: "3. 呼吸力学・病態の異常波形",
+    title: "① オートPEEP / エアトラッピング",
+    defaultMode: "AC", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "🚨 呼気不完全（エアトラッピング） / 胸腔内圧上昇・血圧低下リスク",
+    physicalSign: "呼気が長く、息を吐き切る前に次の送気が入る・聴診でWheezes",
+    vitals: { ppeak: 24, peep: "5(tot11)", vti: 480, vte: 440, rr: "24 / 20", etco2: 52 },
+    hintNovice: "水色の線（流量波形）の下半分は「吐いている息のスピード」を表します。本来は全部吐き終わって真ん中のゼロの線（基線）に戻ってから次の息を吸いますが、吐き切る前に次の送気が始まってしまい、肺の中にどんどん空気が溜まって膨らみすぎている危険な波形です。",
+    hintExpert: "呼気流量波形が基線（0 L/min）に戻りきる前に次の吸気が開始されているエアトラッピング（動的肺過膨張）の波形です。呼気終末ホールドを行うと設定PEEPを上回る総PEEP（Auto-PEEP）が計測され、静脈還流減少による血圧低下やミストリガーを惹起します。",
+    animType: "auto_peep",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "COPDや喘息、痰の詰まりなどで空気の通り道が狭くなり、息を吐き出すのに長い時間がかかっている",
+        textExpert: "COPD・気管支喘息の増悪や気道分泌物貯留により呼気気道抵抗が上昇し、呼気時定数が延長している",
+        reason: "気道が狭く息を吐き出すのに時間がかかり、呼気時間内に吐き切れなくなります。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "呼吸の回数が多すぎる、または吸う時間が長すぎるせいで、「息を吐く時間」が足りなくなっている",
+        textExpert: "頻呼吸、過大な一回換気量、または不適切なI:E比により呼気時間が不足している",
+        reason: "次の吸気が始まるまでの呼気時間が短すぎると、肺内にガスが蓄積（エアトラッピング）します。"
+      },
+      {
+        id: "c3", isCorrect: false,
+        textNovice: "気管チューブのカフから空気が漏れている",
+        textExpert: "気管チューブのカフ破損による回路外への大量エアリーク",
+        reason: "エアリークはオートPEEPとは異なります。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "肺が硬くなって縮む力が強くなり、息が一瞬で吐き出されている",
+        textExpert: "間質性肺炎等による肺コンプライアンス低下に伴う呼気時定数の短縮",
+        reason: "コンプライアンスが低下した硬い肺は一気に縮むため、呼気時間はむしろ短縮します。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "加温加湿器の温度設定が高すぎる",
+        textExpert: "加温加湿器の加熱オーバー",
+        reason: "加湿温度はエアトラッピングの直接原因ではありません。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "最後までしっかり息を吐き切れるように、呼吸器の換気回数を減らすか、吸う時間を短くして「吐く時間」を長くする",
+        textExpert: "設定換気回数の減量や吸気時間（または一回換気量）の短縮により、呼気時間を十分に延長する（I:E比 1:3以上等）",
+        reason: "呼気フローが基線（0）に戻るだけの十分な呼気時間を確保します。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "気管支を広げる薬の吸入や痰の吸引を行って、息を吐き出しやすくする",
+        textExpert: "気管支拡張薬（β2刺激薬等）の投与や気管内吸引を実施し、呼気気道抵抗を改善させる",
+        reason: "末梢気道狭窄や痰による気流制限を改善し、呼出をスムーズにします。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "肺の中に残った圧力のせいで呼吸器が吸い始めに気づけない時は、設定PEEPを少し上げて吸いやすくする",
+        textExpert: "Auto-PEEPに伴うトリガー障害に対しては、内因性PEEPの80%程度の外因性PEEP（カウンターPEEP）を付加する",
+        reason: "末梢気道の早期閉塞を防ぎ、自発吸気トリガーの仕事量を軽減します。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "設定の呼吸回数を今の20回/minから30回/minに増やす",
+        textExpert: "設定強制換気回数を20回/minから30回/minへ増量する",
+        reason: "換気回数を増やすと呼気時間がさらに短縮し、肺過膨張とショックを招きます。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "空気を送る時間（吸気時間）を2.0秒以上に延ばす",
+        textExpert: "設定吸気時間（TI）を2.0秒以上へ延長する",
+        reason: "吸気時間を延ばすと呼気時間が奪われ、オートPEEPが致命的に悪化します。"
+      }
+    ]
+  },
+  {
+    id: "3-2",
+    category: "3. 呼吸力学・病態の異常波形",
+    title: "② 気道抵抗の上昇（Increased Resistance）",
+    defaultMode: "AC", defaultCtrl: "VCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "🚨 最高気道内圧上限アラーム（Ppeak 38） / 呼気流量の延長",
+    physicalSign: "チューブの噛み込み・屈曲、または吸引カテーテル挿入抵抗・喘鳴",
+    vitals: { ppeak: 38, peep: "5.0", vti: 450, vte: 450, rr: "15 / 15", etco2: 45 },
+    hintNovice: "細いストローで風船を膨らませる時のように、空気の通り道（チューブや気管支）が狭くなっている波形です。息を吐く水色の線がダラダラと横に長く伸びます。VCVモードでは一番高い圧力（ピーク圧）だけが跳ね上がり、PCVモードでは空気の入る勢いが落ちて換気量が減ります。",
+    hintExpert: "気流制限により呼気ピークフローの低下と呼気時間の延長を認めます。VCV（矩形波＋吸気ポーズ）ではプラトー圧（Pplat 20）は変化せず最高気道内圧（Ppeak 38）のみが上昇し、Ppeak − Pplatの差圧が開大します。PCVでは吸気・呼気ともにピークフローが低下し一回換気量が減少します。",
+    animType: "high_resistance",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "気管チューブが折れ曲がっている、患者さんがチューブを噛んでいる、または人工鼻に水が詰まっている",
+        textExpert: "気管チューブの屈曲・患者による咬み込み・細径チューブ、または人工鼻（HME）の水分閉塞",
+        reason: "回路やチューブの通り道が狭くなると気道抵抗が急上昇し、Ppeak − Pplatが開大します。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "チューブや気管の中に硬い痰が詰まっている、または気管支が細くなっている",
+        textExpert: "気管内・チューブ内の粘稠痰貯留、気管支攣縮（喘息発作）、気管切開カニューレ先端の肉芽当たり",
+        reason: "気道内腔の狭窄によりガスが流れにくくなり、吸気高圧・呼気延長を呈します。"
+      },
+      {
+        id: "c3", isCorrect: false,
+        textNovice: "肺炎や肺水腫が悪化して、肺そのもの（風船のゴム）が硬くなっている",
+        textExpert: "ARDSや心原性肺水腫の増悪による肺実質コンプライアンスの低下",
+        reason: "肺コンプライアンス低下ではプラトー圧自体が上昇し、Ppeak − Pplatの差は拡大しません。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "呼吸器のホースが外れて、空気が全部外に漏れている",
+        textExpert: "呼吸回路の接続外れによる大量エアリーク",
+        reason: "回路外れでは気道内圧が低下します。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "お腹に水が溜まって（腹水）、下から肺が押しつぶされている",
+        textExpert: "大量腹水による腹腔内圧上昇",
+        reason: "腹腔内圧上昇はコンプライアンス低下の原因であり、気道抵抗上昇の主因ではありません。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "気管内吸引をして痰を取り除き、人工鼻が濡れて詰まっていたら新しいものに交換する",
+        textExpert: "気管内吸引を実施して貯留分泌物を除去し、人工鼻（HME）の閉塞があれば直ちに交換する",
+        reason: "最も頻度の高いチューブ・人工鼻の閉塞原因を取り除きます。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "チューブを噛んでいる時はバイトブロックを入れて噛めないようにし、ホースの折れ曲がりを直す",
+        textExpert: "チューブ咬み込みに対してバイトブロック装着や鎮静調整を行い、チューブ屈曲を解除する",
+        reason: "物理的なチューブ狭窄・閉塞を解除して気道内腔を確保します。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "ヒューヒュー（喘鳴）と音がしていたら、医師の指示で気管支を広げる吸入薬を使う",
+        textExpert: "聴診でWheezes（気管支攣縮）を認める場合は、気管支拡張薬（β2刺激薬等）の吸入療法を実施する",
+        reason: "末梢気道狭窄を拡張させて気流制限を改善します。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "気胸を疑って、すぐに胸に管を入れる（胸腔ドレナージ）準備をする",
+        textExpert: "緊張性気胸と判断し、直ちに胸腔穿刺・胸腔ドレナージを施行する",
+        reason: "胸腔ドレナージは気胸に対する処置です。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "気道内圧上限アラームが鳴らないように、アラームの上限設定を80 cmH2Oまで上げる",
+        textExpert: "原因検索を行わずに気道内圧上限アラーム設定値のみを80 cmH2Oへ引き上げる",
+        reason: "閉塞原因を放置して圧上限だけを上げると、換気不能や圧外傷を招き極めて危険です。"
+      }
+    ]
+  },
+  {
+    id: "3-3",
+    category: "3. 呼吸力学・病態の異常波形",
+    title: "③ コンプライアンスの低下（Low Compliance）",
+    defaultMode: "AC", defaultCtrl: "VCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "🚨 高気道内圧（Pplat 32 / Ppeak 37） ※PCV時は一回換気量低下",
+    physicalSign: "肺・胸郭が硬く広がりにくい・聴診で水泡音や片側呼吸音減弱",
+    vitals: { ppeak: 37, peep: "8.0", vti: 360, vte: 360, rr: "18 / 18", etco2: 44 },
+    hintNovice: "分厚くて硬いゴム風船を膨らませる時のように、肺や胸が硬くなって膨らみにくい状態の波形です。VCVモードでは肺自体にかかる圧力（プラトー圧）と一番高い圧力（ピーク圧）の両方が同じだけ高くなり、PCVモードではすぐに肺がいっぱいになってしまい入る空気の量（換気量）が減ってしまいます。",
+    hintExpert: "VCVではプラトー圧（Pplat）と最高気道内圧（Ppeak）が同じ幅だけ上昇します。PCVでは吸気流量が早期にゼロへ減衰し、一回換気量が著明に減少します。",
+    animType: "low_compliance",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "ARDS（重症呼吸不全）や肺炎、肺水腫、無気肺などで、肺そのものが水っぽくなったり硬くなったりしている",
+        textExpert: "ARDS、無気肺、心原性・非心原性肺水腫、重症肺炎、間質性肺炎の進行による肺コンプライアンス低下",
+        reason: "肺実質が硬くなり機能的肺容量が減少するため、プラトー圧が上昇します。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "気胸や胸水、お腹の張り（腹水など）で、外側から肺が圧迫されて広がれない",
+        textExpert: "気胸（緊張性気胸）、大量胸水、または腹水・腸管浮腫による胸郭コンプライアンスの低下",
+        reason: "肺外からの圧迫によっても肺胸郭コンプライアンスが著しく低下します。"
+      },
+      {
+        id: "c3", isCorrect: false,
+        textNovice: "患者さんが気管チューブを噛んでいて、チューブの中が狭くなっている",
+        textExpert: "気管チューブの咬み込みや吸気・呼気フィルターの閉塞",
+        reason: "チューブ狭窄は気道抵抗上昇の原因であり、プラトー圧は上昇しません。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "呼吸器のホースの中に結露の水が溜まって揺れている",
+        textExpert: "ウォータートラップおよび呼気回路内の結露水貯留",
+        reason: "結露水は波形の細かい振動やオートトリガーの原因です。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "気管チューブのカフの空気が抜けている",
+        textExpert: "気管チューブのカフ圧不足によるエアリーク",
+        reason: "カフリークでは気道内圧や呼気換気量が低下します。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "硬くなった肺が無理に膨らんで傷つかないように、1回に入れる空気の量を控えめ（予測体重×6 mL/kgなど）にし、プラトー圧を30以下に保つ",
+        textExpert: "肺保護換気戦略に基づき一回換気量を6 mL/kg（PBW）程度へ制限し、プラトー圧≤30 cmH2O・駆動圧<15 cmH2Oを維持する",
+        reason: "硬く小さくなった肺の過伸展（VILI）を防ぐため、換気量と駆動圧を制限します。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "つぶれた肺胞を広げるために適切なPEEPをかけたり、重症ARDSではうつ伏せ（腹臥位療法）を取り入れたりする",
+        textExpert: "無気肺や重症ARDSに対し、至適PEEPの設定やリクルートメント、腹臥位療法を導入して換気分布を均一化する",
+        reason: "背側虚脱肺胞を再開存させ、機能的残気量とコンプライアンスを改善します。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "片方の胸が上がらないなど「気胸」が疑われる時は、すぐに医師が胸に管を入れて空気を抜く（胸腔ドレナージ）",
+        textExpert: "DOPEアプローチで気胸（片側呼吸音減弱・皮下気腫・血圧低下）を認める場合は、直ちに胸腔ドレナージ（脱気）を施行する",
+        reason: "陽圧換気下の気胸は緊張性気胸へ進行するため緊急脱気が必要です。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "肺が膨らみにくいので、1回に入れる空気の量（一回換気量）を800 mLに増やして力強く膨らませる",
+        textExpert: "設定一回換気量（VT）を800 mL（12 mL/kg以上）へ増量して高圧で送気する",
+        reason: "コンプライアンス低下肺への大換気量送気は致命的な圧損傷・容量損傷を引き起こします。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "PEEPを0 cmH2Oに下げる",
+        textExpert: "PEEP設定を0 cmH2O（ZEEP）へ下げる",
+        reason: "PEEPをゼロにすると呼気終末に肺胞が虚脱し、無気肺損傷と低酸素血症が悪化します。"
+      }
+    ]
+  },
+  {
+    id: "4-1",
+    category: "4. 回路・デバイス・分泌物トラブル",
+    title: "① 回路・カフのエアリーク（Air Leak）",
+    defaultMode: "AC", defaultCtrl: "VCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "🚨 呼気換気量下限（VTe 240 < VTi 480） / 分時換気量低下",
+    physicalSign: "口元から空気漏れ音（声漏れ）・カフ圧低下または回路接続の緩み",
+    vitals: { ppeak: 16, peep: "4.2", vti: 480, vte: 240, rr: "15 / 15", etco2: 22 },
+    hintNovice: "一番下の緑色の線（換気量波形）に注目してください。山が上がった分（送った空気の量）だけ、息を吐いた時には一番下のゼロの線まで降りてくるはずですが、途中で空気が外へ漏れているため、山がゼロまで戻らず途中で平らに切れてしまっているのがリーク（空気漏れ）のサインです。",
+    hintExpert: "換気量波形（Volume-Time）において、吸気時に送気された容量（VTi）に対して呼気時に回収される容量（VTe）が減少し、呼気曲線が基線（0 mL）に戻らず途中で水平に途切れたまま次回の吸気開始時にゼロへリセットされる典型的なリーク波形です。",
+    animType: "air_leak",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "気管チューブのカフ（風船）の空気が抜けている、またはカフが破れている",
+        textExpert: "気管チューブのカフ圧不足、またはカフ・インフレーションチューブ・パイロットバルーンの破損",
+        reason: "カフ周囲から空気が漏れるため、呼気回路へ戻る換気量（VTe）が減少します。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "気管チューブが浅く抜けかかっていて、カフが声帯の上までずれている",
+        textExpert: "気管チューブの固定位置異常・浅過（DOPEのDisplacement：声帯上へのカフ逸脱）",
+        reason: "体位変換後などにチューブが抜けかかると、口元からの大量リークを生じます。"
+      },
+      {
+        id: "c3", isCorrect: true,
+        textNovice: "呼吸器のホースのつなぎ目や、水溜め（ウォータートラップ）、加湿器のふたが緩んでいる",
+        textExpert: "呼吸回路接続部、ウォータートラップ、加温加湿器チャンバー周辺の緩み・亀裂",
+        reason: "閉鎖回路の接続不良箇所から送気ガスが外部へ漏出します。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "喘息の発作で気管支が狭くなっている",
+        textExpert: "気管支喘息発作による末梢気道抵抗の上昇",
+        reason: "気道狭窄は呼気延長や気道抵抗上昇の原因であり、リークの原因ではありません。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "鎮静薬が効きすぎていて自発呼吸がなくなっている",
+        textExpert: "過鎮静による中枢性無呼吸",
+        reason: "自発呼吸の消失だけでは回路のリーク波形は生じません。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "気管チューブの固定の深さを確認し、カフ圧計でカフ圧を適正な強さ（20〜30 cmH2O）に直す",
+        textExpert: "気管チューブの口角固定深さを確認し、カフ圧計で20〜30 cmH2Oへ調整する（破損時はチューブ交換）",
+        reason: "まず患者側の気道確保（抜けかけの有無）とカフ圧を確認・修正します。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "呼吸器の出口からホース、水溜め（ウォータートラップ）まで順番にたどって、緩んでいるつなぎ目をしっかり締める",
+        textExpert: "吸気口から加温加湿器・蛇管・ウォータートラップを通って呼気口までを点検し、接続部の緩みを増し締め・交換する",
+        reason: "直前に吸引や水抜き操作を行った箇所を中心に接続部を一周点検します。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "もし患者さんの顔色が悪いなど緊急の時は、原因を探しながら一度バッグバルブマスク（用手換気）に切り替える",
+        textExpert: "低換気・低酸素血症が進行している場合は、原因検索と並行して用手換気（BVM等）へ切り替える",
+        reason: "DOPEアプローチの基本として、バイタル悪化時は用手換気で確実に換気を担保します。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "空気漏れはそのままにして、トリガー感度を一番敏感な設定にする",
+        textExpert: "リーク原因を放置したままフロートリガーを0.5 L/minへ鋭敏化する",
+        reason: "リークがある状態で感度を鋭敏にすると激しいオートトリガーを誘発します。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "カフの空気を全部抜いて0 cmH2Oにする",
+        textExpert: "カフ圧を完全に脱気する",
+        reason: "カフを抜くとリークが最大化し、換気不能および誤嚥を招きます。"
+      }
+    ]
+  },
+  {
+    id: "4-2",
+    category: "4. 回路・デバイス・分泌物トラブル",
+    title: "② 回路内結露・分泌物（Saw-Tooth波形）",
+    defaultMode: "AC", defaultCtrl: "PCV",
+    allowedModes: ["AC", "SIMV", "CPAP_PS"],
+    allowedCtrls: ["PCV", "VCV"],
+    alarm: "⚠️ 圧・流量波形のノコギリ状振動 / オートトリガー誘発リスク",
+    physicalSign: "聴診で水泡音（ゴロゴロ音）・呼気蛇管やトラップに結露水の貯留",
+    vitals: { ppeak: 21, peep: "5.0", vti: 440, vte: 440, rr: "16 / 16", etco2: 39 },
+    hintNovice: "黄色（圧波形）や水色（流量波形）の線が、のこぎりの歯のように細かくギザギザと揺れている波形です。空気が通る道（気管チューブの中や呼吸器のホースの中）に痰や結露の水が溜まっていて、空気が通るたびにポコポコ・ゴロゴロと揺れているサインです。",
+    hintExpert: "気道内圧波形および流量波形の吸気相・呼気相全体に、ノコギリ状（Saw-Tooth）の細かい周期的振動が出現する波形です。気管・チューブ内の分泌物貯留や呼吸回路内の結露水による気流の乱れを示し、放置するとオートトリガーの原因となります。",
+    animType: "saw_tooth",
+    causes: [
+      {
+        id: "c1", isCorrect: true,
+        textNovice: "気管や気管チューブの中に痰（分泌物）が溜まっていて、空気が通るたびに揺れている",
+        textExpert: "気管内および気管チューブ内腔における気道分泌物（喀痰）の貯留",
+        reason: "気道内の分泌物が気流で揺れ動くことで、流量・圧波形にノコギリ状の振動が生じます。"
+      },
+      {
+        id: "c2", isCorrect: true,
+        textNovice: "呼吸器のホース（蛇管）や水溜め（ウォータートラップ）に結露の水がたくさん溜まっている",
+        textExpert: "呼吸回路（蛇管のたるみ部分やウォータートラップ）内への結露水の貯留",
+        reason: "回路内の水溜まりがガス通過時にバブリングを起こし、波形を乱します。"
+      },
+      {
+        id: "c3", isCorrect: true,
+        textNovice: "病室の温度が低い、またはエアコンの風がホースに直接当たっていて結露が増えている",
+        textExpert: "室温低下や空調（エアコン）の冷風直撃による回路内結露の多量発生",
+        reason: "周囲環境温が低いと回路内の水蒸気が冷やされ、結露水が多量に発生します。"
+      },
+      {
+        id: "c4", isCorrect: false,
+        textNovice: "VCVモードで空気を送るスピード（吸気流量）が足りていない",
+        textExpert: "VCVにおける設定吸気流量の不足（Flow Starvation）",
+        reason: "吸気流量不足はサギングを呈し、ギザギザ波形にはなりません。"
+      },
+      {
+        id: "c5", isCorrect: false,
+        textNovice: "プレッシャーサポートのサイクルオフ設定が合っていない",
+        textExpert: "PSVにおける呼気トリガー感度の不適合",
+        reason: "サイクルオフ設定の不適合は送気の早期終了や終了遅延の原因です。"
+      }
+    ],
+    actions: [
+      {
+        id: "a1", isCorrect: true,
+        textNovice: "胸の音を聴いて痰がゴロゴロしていたら、気管内吸引を行って痰を取り除く",
+        textExpert: "呼吸音を聴診して評価し、気管内吸引を実施して気道内分泌物を除去する",
+        reason: "チューブや主気管支に貯留した喀痰を吸引することで気流の乱れが消失します。"
+      },
+      {
+        id: "a2", isCorrect: true,
+        textNovice: "ホースに溜まった水を一番低い位置の水溜め（ウォータートラップ）に集めて捨て、患者さん側へ逆流しないようにする",
+        textExpert: "ウォータートラップを回路の最下点に配置して結露水を排液し、清拭・体位変換時の回路内逆流を防止する",
+        reason: "回路内の水溜まりを排液することで振動およびオートトリガーのリスクを解消します。"
+      },
+      {
+        id: "a3", isCorrect: true,
+        textNovice: "エアコンの風がホースに直接当たらないように風向きや室温を調整する",
+        textExpert: "加温加湿器の温度設定や室温・空調の風向きを調整し、回路の冷却による結露再発を予防する",
+        reason: "空調の風が回路に直撃しないよう環境を整えることで、結露の再貯留を予防できます。"
+      },
+      {
+        id: "a4", isCorrect: false,
+        textNovice: "水滴を吸い取らせるために、加温加湿器の電源を入れたまま、口元に人工鼻（フィルター）も一緒につける",
+        textExpert: "加温加湿器を稼働させたまま回路の口元へ人工鼻（HME）を追加併用する",
+        reason: "【絶対禁忌】加温加湿器と人工鼻の併用は、人工鼻が水分で完全閉塞し窒息を招くため禁忌です。"
+      },
+      {
+        id: "a5", isCorrect: false,
+        textNovice: "ホースに溜まった水を揺れないようにするため、患者さん側の気管チューブへ流し込む",
+        textExpert: "蛇管を持ち上げて貯留した結露水を患者の気管チューブ側へ流入させる",
+        reason: "汚染された回路内結露水を気道へ流入させると、激しいバッキングやVAPを引き起こします。"
+      }
+    ]
+  }
+];
+
+const SCENARIOS = SCENARIOS_PART1.concat(SCENARIOS_PART2);
+</script>
+<script>
+let currentScenarioIndex = 0;
+let currentMode = "AC";
+let currentCtrl = "PCV";
+let currentLevel = "novice";
+let isNormalOverlay = false;
+let isResolved = false;
+let isPaused = false;
+let animTime = 12.0; // 起動直後から画面左端まで波形が描画されるよう初期値を12.0秒に設定
+let flowDotPhase = 0;
+let selectedCauses = new Set();
+let selectedActions = new Set();
+let hasEvaluated = false;
+let canvasLogicalW = 700;
+let canvasLogicalH = 400;
+
+const scenarioSelect = document.getElementById("scenarioSelect");
+const ventModeBadge = document.getElementById("ventModeBadge");
+const toggleNormalBtn = document.getElementById("toggleNormalBtn");
+const pauseWaveBtn = document.getElementById("pauseWaveBtn");
+const alarmBanner = document.getElementById("alarmBanner");
+const alarmText = document.getElementById("alarmText");
+const simStatusLabel = document.getElementById("simStatusLabel");
+const physicalSignText = document.getElementById("physicalSignText");
+const svgAnimContainer = document.getElementById("svgAnimContainer");
+const causeTab = document.getElementById("causeTab");
+const actionTab = document.getElementById("actionTab");
+const badgeCause = document.getElementById("badgeCause");
+const badgeAction = document.getElementById("badgeAction");
+const hintLevelTitle = document.getElementById("hintLevelTitle");
+const hintFeatureText = document.getElementById("hintFeatureText");
+const interveneBtn = document.getElementById("interveneBtn");
+const resetQuizBtn = document.getElementById("resetQuizBtn");
+const feedbackPanel = document.getElementById("feedbackPanel");
+const waveCanvas = document.getElementById("waveCanvas");
+const ctx = waveCanvas ? waveCanvas.getContext("2d") : null;
+
+function resizeCanvasSafely() {
+  if (!waveCanvas || !ctx) return;
+  const parent = waveCanvas.parentElement;
+  if (!parent) return;
+  const rect = parent.getBoundingClientRect();
+  const w = Math.max(280, Math.floor(rect.width));
+  const h = Math.max(240, Math.floor(rect.height));
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  canvasLogicalW = w;
+  canvasLogicalH = h;
+  waveCanvas.width = w * dpr;
+  waveCanvas.height = h * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function updateNormalBtnUI() {
+  if (!toggleNormalBtn) return;
+  if (isResolved) {
+    toggleNormalBtn.disabled = true;
+    toggleNormalBtn.textContent = "正常比較(実線): 正常化済";
+    toggleNormalBtn.classList.remove("active-overlay");
+  } else {
+    toggleNormalBtn.disabled = false;
+    toggleNormalBtn.textContent = isNormalOverlay ? "正常比較(実線): ON" : "正常比較(実線): OFF";
+    toggleNormalBtn.classList.toggle("active-overlay", isNormalOverlay);
+  }
+}
+
+function initSimulator() {
+  if (!scenarioSelect) return;
+
+  const categories = {};
+  SCENARIOS.forEach((sc, idx) => {
+    if (!categories[sc.category]) categories[sc.category] = [];
+    categories[sc.category].push({ ...sc, idx });
+  });
+
+  scenarioSelect.innerHTML = "";
+  Object.keys(categories).forEach(catName => {
+    const optGroup = document.createElement("optgroup");
+    optGroup.label = catName;
+    categories[catName].forEach(item => {
+      const opt = document.createElement("option");
+      opt.value = item.idx;
+      opt.textContent = item.title;
+      optGroup.appendChild(opt);
+    });
+    scenarioSelect.appendChild(optGroup);
+  });
+
+  scenarioSelect.addEventListener("change", (e) => {
+    loadScenario(parseInt(e.target.value, 10) || 0);
+  });
+
+  document.querySelectorAll("#modeSegGroup .seg-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      currentMode = btn.getAttribute("data-mode") || "AC";
+      syncModeButtonsUI();
+    });
+  });
+
+  document.querySelectorAll("#ctrlSegGroup .seg-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.disabled) return;
+      currentCtrl = btn.getAttribute("data-ctrl") || "PCV";
+      syncModeButtonsUI();
+    });
+  });
+
+  document.querySelectorAll("#expLevelGroup .lvl-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#expLevelGroup .lvl-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentLevel = btn.getAttribute("data-level") || "novice";
+      refreshLevelTexts();
+    });
+  });
+
+  if (toggleNormalBtn) {
+    toggleNormalBtn.addEventListener("click", () => {
+      if (isResolved) return;
+      isNormalOverlay = !isNormalOverlay;
+      updateNormalBtnUI();
+    });
+  }
+
+  if (pauseWaveBtn) {
+    pauseWaveBtn.addEventListener("click", () => {
+      isPaused = !isPaused;
+      pauseWaveBtn.textContent = isPaused ? "▶️ 再開" : "⏸ 停止";
+    });
+  }
+
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      btn.classList.add("active");
+      const targetId = btn.getAttribute("data-tab");
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) targetEl.classList.add("active");
+    });
+  });
+
+  if (interveneBtn) interveneBtn.addEventListener("click", evaluateIntervention);
+  if (resetQuizBtn) resetQuizBtn.addEventListener("click", () => loadScenario(currentScenarioIndex));
+
+  window.addEventListener("resize", resizeCanvasSafely);
+  resizeCanvasSafely();
+  loadScenario(0);
+  requestAnimationFrame(renderLoop);
+}
+
+/**
+ * 現在の症例・換気モード・制御パターン・解決状態に応じたバイタルとアラーム文言を算出
+ */
+function getDynamicScenarioMeta(sc, mode, ctrl, resolved) {
+  const isCpapPs = (mode === "CPAP_PS");
+  const isSimv = (mode === "SIMV");
+  const useVcv = (!isCpapPs && ctrl === "VCV");
+
+  if (resolved) {
+    let ppeak = "19";
+    let vtText = "450 / 450";
+    let rrText = "15 / 15";
+    if (isCpapPs) {
+      ppeak = "15";
+      vtText = "380 / 380";
+      rrText = "15 / -(自発)";
+    } else if (isSimv) {
+      ppeak = useVcv ? "20(PS15)" : "19(PS15)";
+      vtText = "450(PS380)";
+      rrText = "15 / 8";
+    } else if (useVcv) {
+      ppeak = "20";
+    }
+    return {
+      ppeak,
+      peep: "5.0",
+      vtText,
+      rrText,
+      etco2: 38,
+      alarm: "✅ 介入成功：非同調・異常波形が解消され、患者と人工呼吸器が同調しています"
+    };
+  }
+
+  let ppeak = sc.vitals.ppeak;
+  let peep = sc.vitals.peep;
+  let vti = sc.vitals.vti;
+  let vte = sc.vitals.vte;
+  let rrText = sc.vitals.rr;
+  let etco2 = sc.vitals.etco2;
+  let alarm = sc.alarm;
+
+  // CPAP+PSV時は設定換気回数が存在しないため表記を自発モード用に調整
+  if (isCpapPs) {
+    if (sc.id === "1-1") rrText = "12/-(努24)";
+    else {
+      const parts = String(rrText).split("/");
+      if (parts.length === 2) {
+        rrText = `${parts[0].trim()} / -(自発)`;
+      }
+    }
+  }
+
+  // 症例ごとのモード・制御パターン（VCV vs PCV/PSV）による圧・換気量の変化を反映
+  if (sc.id === "1-1") {
+    if (isCpapPs) {
+      ppeak = 15;
+      vti = 380;
+      vte = 380;
+    } else if (useVcv) {
+      ppeak = 20;
+    }
+  } else if (sc.id === "1-3") {
+    if (!useVcv) {
+      ppeak = 24;
+      vti = 700;
+      vte = 680;
+      alarm = "🚨 一回換気量過大（約2倍: 700mL） / 連続送気（二段呼吸）";
+    } else {
+      ppeak = 39;
+      vti = 780;
+      vte = 760;
+      alarm = "🚨 気道内圧上限アラーム（Ppeak 39） / 一回換気量過大（約2倍）";
+    }
+  } else if (sc.id === "1-4") {
+    if (useVcv) {
+      ppeak = 31;
+      alarm = "⚠️ 高気道内圧（Ppeak 31）・高一回換気量 / 強制換気直後の二段呼吸";
+    }
+  } else if (sc.id === "2-2") {
+    if (useVcv) ppeak = 20;
+    else if (isCpapPs) ppeak = 16;
+  } else if (sc.id === "3-1") {
+    if (useVcv) ppeak = 26;
+    else if (isCpapPs) ppeak = 20;
+  } else if (sc.id === "3-2") {
+    if (useVcv) {
+      ppeak = 38;
+      vti = 450;
+      vte = 450;
+      alarm = "🚨 最高気道内圧上限アラーム（Ppeak 38 / Pplat 20） / 呼気流量の延長";
+    } else {
+      ppeak = isCpapPs ? 18 : 20;
+      vti = 320;
+      vte = 320;
+      alarm = "🚨 一回換気量低下（VT 320mL）・吸気呼気フロー低下 / 気道抵抗上昇";
+    }
+  } else if (sc.id === "3-3") {
+    if (useVcv) {
+      ppeak = 37;
+      vti = 360;
+      vte = 360;
+      alarm = "🚨 高気道内圧（Pplat 32 / Ppeak 37） / コンプライアンス低下";
+    } else {
+      ppeak = isCpapPs ? 20 : 22;
+      vti = 260;
+      vte = 260;
+      alarm = "🚨 一回換気量低下（VT 260mL）・吸気流量早期減衰 / コンプライアンス低下";
+    }
+  } else if (sc.id === "4-1") {
+    if (!useVcv) {
+      ppeak = 15;
+    }
+  } else if (sc.id === "4-2") {
+    if (useVcv) ppeak = 22;
+    else if (isCpapPs) ppeak = 17;
+  }
+
+  return {
+    ppeak,
+    peep,
+    vtText: `${vti} / ${vte}`,
+    rrText,
+    etco2,
+    alarm
+  };
+}
+
+function syncModeButtonsUI() {
+  const sc = SCENARIOS[currentScenarioIndex];
+  if (!sc) return;
+
+  const allowedModes = sc.allowedModes || ["AC", "SIMV", "CPAP_PS"];
+  const allowedCtrls = sc.allowedCtrls || ["PCV", "VCV"];
+
+  if (!allowedModes.includes(currentMode)) {
+    currentMode = allowedModes[0];
+  }
+  if (!allowedCtrls.includes(currentCtrl)) {
+    currentCtrl = allowedCtrls[0];
+  }
+
+  document.querySelectorAll("#modeSegGroup .seg-btn").forEach(b => {
+    const m = b.getAttribute("data-mode");
+    const isAllowed = allowedModes.includes(m);
+    b.disabled = !isAllowed;
+    b.classList.toggle("active", isAllowed && m === currentMode);
+  });
+
+  const isCpapPs = (currentMode === "CPAP_PS");
+  document.querySelectorAll("#ctrlSegGroup .seg-btn").forEach(b => {
+    const c = b.getAttribute("data-ctrl");
+    const isAllowed = !isCpapPs && allowedCtrls.includes(c);
+    b.disabled = !isAllowed;
+    b.classList.toggle("ctrl-active", isAllowed && c === currentCtrl);
+  });
+
+  const modeNameMap = {
+    "AC": "A/C",
+    "SIMV": "SIMV+PS",
+    "CPAP_PS": "CPAP+PSV"
+  };
+
+  if (ventModeBadge) {
+    if (isCpapPs) {
+      ventModeBadge.textContent = `現在設定: ${modeNameMap[currentMode]} (自発呼吸モード)`;
+    } else {
+      ventModeBadge.textContent = `現在設定: ${modeNameMap[currentMode]} - ${currentCtrl}`;
+    }
+  }
+
+  updateVitalsDisplay(sc.vitals, isResolved);
+
+  // 未解決かつ既に判定を行っていた場合は、選択中のモードに合わせて判定結果も同期更新
+  if (!isResolved && hasEvaluated && selectedCauses.size > 0 && selectedActions.size > 0) {
+    evaluateIntervention();
+  }
+}
+
+function loadScenario(index) {
+  currentScenarioIndex = index;
+  const sc = SCENARIOS[index];
+  if (!sc) return;
+
+  isResolved = false;
+  isNormalOverlay = false;
+  hasEvaluated = false;
+  selectedCauses.clear();
+  selectedActions.clear();
+
+  currentMode = sc.defaultMode || "AC";
+  currentCtrl = sc.defaultCtrl || "PCV";
+  updateNormalBtnUI();
+  syncModeButtonsUI();
+
+  if (alarmBanner) alarmBanner.classList.remove("resolved");
+  if (simStatusLabel) simStatusLabel.textContent = "状態: 介入前（異常波形）";
+  if (physicalSignText) physicalSignText.textContent = sc.physicalSign;
+
+  updateVitalsDisplay(sc.vitals, false);
+
+  renderOptions(causeTab, sc.causes, selectedCauses, "cause");
+  renderOptions(actionTab, sc.actions, selectedActions, "action");
+  updateHintDisplay(sc);
+  updateSelectionCounter();
+
+  if (feedbackPanel) {
+    feedbackPanel.className = "feedback-panel";
+    feedbackPanel.innerHTML = "";
+  }
+
+  buildDetailedCircuitSVG();
+}
+
+function refreshLevelTexts() {
+  const sc = SCENARIOS[currentScenarioIndex];
+  if (!sc) return;
+
+  sc.causes.forEach(item => {
+    const span = document.getElementById(`text-cause-${item.id}`);
+    if (span) {
+      span.textContent = (currentLevel === "novice") ? item.textNovice : item.textExpert;
+    }
+  });
+
+  sc.actions.forEach(item => {
+    const span = document.getElementById(`text-action-${item.id}`);
+    if (span) {
+      span.textContent = (currentLevel === "novice") ? item.textNovice : item.textExpert;
+    }
+  });
+
+  updateHintDisplay(sc);
+
+  if (hasEvaluated && selectedCauses.size > 0 && selectedActions.size > 0) {
+    evaluateIntervention();
+  }
+}
+
+function updateHintDisplay(sc) {
+  if (!hintLevelTitle || !hintFeatureText) return;
+  if (currentLevel === "novice") {
+    hintLevelTitle.textContent = "🌱 新人看護師向け：波形の特徴と観察ポイント";
+    hintFeatureText.textContent = sc.hintNovice;
+  } else {
+    hintLevelTitle.textContent = "🎓 5年目以上向け：呼吸生理・メカニクスと波形解析";
+    hintFeatureText.textContent = sc.hintExpert;
+  }
+}
+
+function updateVitalsDisplay(vitals, resolved) {
+  const sc = SCENARIOS[currentScenarioIndex];
+  if (!sc) return;
+
+  const meta = getDynamicScenarioMeta(sc, currentMode, currentCtrl, resolved);
+
+  const elPpeak = document.getElementById("valPpeak");
+  const elPeep = document.getElementById("valPeep");
+  const elVt = document.getElementById("valVt");
+  const elRr = document.getElementById("valRr");
+  const elEtco2 = document.getElementById("valEtco2");
+
+  if (elPpeak) elPpeak.textContent = meta.ppeak;
+  if (elPeep) elPeep.textContent = meta.peep;
+  if (elVt) elVt.textContent = meta.vtText;
+  if (elRr) elRr.textContent = meta.rrText;
+  if (elEtco2) elEtco2.textContent = meta.etco2;
+
+  if (alarmText && (!hasEvaluated || resolved)) {
+    alarmText.textContent = meta.alarm;
+  }
+}
+
+function clearEvaluationHighlights() {
+  document.querySelectorAll(".option-item").forEach(el => {
+    el.classList.remove("correct-highlight", "wrong-highlight");
+  });
+}
+
+function renderOptions(container, items, selectedSet, groupPrefix) {
+  if (!container) return;
+  container.innerHTML = "";
+  items.forEach(item => {
+    const label = document.createElement("label");
+    label.className = "option-item";
+    label.id = `opt-${groupPrefix}-${item.id}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = item.id;
+    checkbox.checked = selectedSet.has(item.id);
+
+    checkbox.addEventListener("change", () => {
+      if (hasEvaluated) {
+        hasEvaluated = false;
+        clearEvaluationHighlights();
+      }
+      if (checkbox.checked) {
+        selectedSet.add(item.id);
+        label.classList.add("selected");
+      } else {
+        selectedSet.delete(item.id);
+        label.classList.remove("selected");
+      }
+      updateSelectionCounter();
+    });
+
+    const span = document.createElement("span");
+    span.id = `text-${groupPrefix}-${item.id}`;
+    span.textContent = (currentLevel === "novice") ? item.textNovice : item.textExpert;
+
+    label.appendChild(checkbox);
+    label.appendChild(span);
+    container.appendChild(label);
+  });
+}
+
+function updateSelectionCounter() {
+  const cCount = selectedCauses.size;
+  const aCount = selectedActions.size;
+
+  if (badgeCause) {
+    badgeCause.textContent = cCount > 0 ? `選択済(${cCount})` : "未選択";
+    badgeCause.style.background = cCount > 0 ? "#16a34a" : "rgba(0,0,0,0.35)";
+  }
+  if (badgeAction) {
+    badgeAction.textContent = aCount > 0 ? `選択済(${aCount})` : "未選択";
+    badgeAction.style.background = aCount > 0 ? "#16a34a" : "rgba(0,0,0,0.35)";
+  }
+
+  if (interveneBtn) {
+    if (cCount > 0 && aCount > 0) {
+      interveneBtn.disabled = false;
+      interveneBtn.textContent = "💉 選択した内容で介入する（正誤判定）";
+    } else if (cCount === 0 && aCount === 0) {
+      interveneBtn.disabled = true;
+      interveneBtn.textContent = "🔒 「発生要因」と「対処法」を選択すると介入できます";
+    } else if (cCount === 0) {
+      interveneBtn.disabled = true;
+      interveneBtn.textContent = "🔒 あと「発生要因」タブを選択してください";
+    } else {
+      interveneBtn.disabled = true;
+      interveneBtn.textContent = "🔒 あと「対処法」タブを選択してください";
+    }
+  }
+}
+
+/**
+ * 選択肢の判定（現在の換気モードや臨床状況別の代替グループを考慮）
+ */
+function evaluateOptionGroup(items, selectedSet, groupPrefix, isActionGroup) {
+  let groupCorrect = true;
+  const feedbackHtml = [];
+
+  // 代替アプローチグループ（altGroup）ごとに少なくとも1つ選択されているか事前集計
+  const altGroupSelected = {};
+  items.forEach(item => {
+    if (item.isCorrect && item.altGroup) {
+      if (!altGroupSelected[item.altGroup]) altGroupSelected[item.altGroup] = false;
+      if (selectedSet.has(item.id)) {
+        altGroupSelected[item.altGroup] = true;
+      }
+    }
+  });
+
+  const labelOk = isActionGroup ? "適切な対処" : "正解";
+  const labelMiss = isActionGroup ? "選択漏れ（推奨される対処）" : "選択漏れ（該当する要因）";
+  const labelWrong = isActionGroup ? "不適切な対処" : "誤選択";
+  const reasonPrefix = isActionGroup ? "根拠" : "理由";
+
+  items.forEach(item => {
+    const el = document.getElementById(`opt-${groupPrefix}-${item.id}`);
+    if (el) el.classList.remove("correct-highlight", "wrong-highlight");
+    const isChecked = selectedSet.has(item.id);
+    const dispText = (currentLevel === "novice") ? item.textNovice : item.textExpert;
+
+    const isModeSpecific = Array.isArray(item.applicableModes);
+    const matchesCurrentMode = !isModeSpecific || item.applicableModes.includes(currentMode);
+    const hasSatisfiedAlt = Boolean(item.altGroup && altGroupSelected[item.altGroup]);
+
+    if (item.isCorrect && isChecked) {
+      if (el) el.classList.add("correct-highlight");
+      feedbackHtml.push(`<li><strong style="color:#4ade80;">✅ [${labelOk}]</strong> ${dispText}<br><span style="color:#cbd5e1;font-size:0.8rem;">${reasonPrefix}: ${item.reason}</span></li>`);
+    } else if (item.isCorrect && !isChecked) {
+      if (!matchesCurrentMode) {
+        // 他モード（PSV専用またはPCV専用）の正解肢は、現在モードでは未選択でも減点せず補足表示
+        feedbackHtml.push(`<li><strong style="color:#38bdf8;">ℹ️ [別モード時の該当項目]</strong> ${dispText}<br><span style="color:#cbd5e1;font-size:0.8rem;">補足（現在のモードでは選択任意）: ${item.reason}</span></li>`);
+      } else if (hasSatisfiedAlt) {
+        // 病期・状況別の代替アプローチが既に1つ以上選ばれている場合は正解扱いとし、知識補足として表示
+        if (el) el.classList.add("correct-highlight");
+        feedbackHtml.push(`<li><strong style="color:#38bdf8;">💡 [状況により有効な別アプローチ]</strong> ${dispText}<br><span style="color:#cbd5e1;font-size:0.8rem;">${reasonPrefix}: ${item.reason}</span></li>`);
+      } else {
+        groupCorrect = false;
+        if (el) el.classList.add("correct-highlight");
+        feedbackHtml.push(`<li><strong style="color:#facc15;">⚠️ [${labelMiss}]</strong> ${dispText}<br><span style="color:#cbd5e1;font-size:0.8rem;">${reasonPrefix}: ${item.reason}</span></li>`);
+      }
+    } else if (!item.isCorrect && isChecked) {
+      groupCorrect = false;
+      if (el) el.classList.add("wrong-highlight");
+      feedbackHtml.push(`<li><strong style="color:#f87171;">❌ [${labelWrong}]</strong> ${dispText}<br><span style="color:#fca5a5;font-size:0.8rem;">${reasonPrefix}: ${item.reason}</span></li>`);
+    }
+  });
+
+  return { groupCorrect, feedbackHtml };
+}
+
+function evaluateIntervention() {
+  const sc = SCENARIOS[currentScenarioIndex];
+  if (!sc || !feedbackPanel) return;
+
+  hasEvaluated = true;
+
+  const causeEval = evaluateOptionGroup(sc.causes, selectedCauses, "cause", false);
+  const actionEval = evaluateOptionGroup(sc.actions, selectedActions, "action", true);
+  const allCorrect = causeEval.groupCorrect && actionEval.groupCorrect;
+
+  feedbackPanel.className = "feedback-panel show";
+  if (allCorrect) {
+    isResolved = true;
+    isNormalOverlay = false;
+    updateNormalBtnUI();
+    if (alarmBanner) alarmBanner.classList.add("resolved");
+    if (simStatusLabel) simStatusLabel.textContent = "状態: 改善（正常同調波形へ移行）";
+    updateVitalsDisplay(sc.vitals, true);
+
+    feedbackPanel.innerHTML = `
+      <div class="fb-header" style="color:#4ade80;">🎉 完全正解！適切なアセスメントと臨床介入により波形が正常化しました</div>
+      <div style="margin-top:6px;"><strong>【発生要因の振り返り】</strong><ul class="fb-reason-list">${causeEval.feedbackHtml.join("")}</ul></div>
+      <div style="margin-top:10px;"><strong>【対処法の振り返り】</strong><ul class="fb-reason-list">${actionEval.feedbackHtml.join("")}</ul></div>
+    `;
+  } else {
+    isResolved = false;
+    updateNormalBtnUI();
+    if (alarmBanner) alarmBanner.classList.remove("resolved");
+    if (alarmText) alarmText.textContent = "⚠️ 一部不適切な選択または見落としがあります（理由を確認し再介入してください）";
+    if (simStatusLabel) simStatusLabel.textContent = "状態: 異常持続（再評価が必要）";
+    updateVitalsDisplay(sc.vitals, false);
+
+    feedbackPanel.innerHTML = `
+      <div class="fb-header" style="color:#f87171;">❌ 不正解または選択漏れがあります（異常波形が持続しています）</div>
+      <p style="font-size:0.8rem;color:#cbd5e1;margin-bottom:6px;">緑枠が選ぶべき項目、赤枠が誤って選択した項目です。以下の根拠を確認してチェックを修正し、再度「介入する」ボタンを押してください。</p>
+      <div style="margin-top:6px;"><strong>【発生要因の判定と理由】</strong><ul class="fb-reason-list">${causeEval.feedbackHtml.join("")}</ul></div>
+      <div style="margin-top:10px;"><strong>【対処法の判定と理由】</strong><ul class="fb-reason-list">${actionEval.feedbackHtml.join("")}</ul></div>
+    `;
+  }
+}
+
+function buildDetailedCircuitSVG() {
+  if (!svgAnimContainer) return;
+  svgAnimContainer.innerHTML = `
+    <svg viewBox="0 0 650 205" width="100%" height="100%">
+      <defs>
+        <linearGradient id="ventGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#334155"/>
+          <stop offset="100%" stop-color="#0f172a"/>
+        </linearGradient>
+        <linearGradient id="lungGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#fb7185" stop-opacity="0.65"/>
+          <stop offset="100%" stop-color="#be123c" stop-opacity="0.35"/>
+        </linearGradient>
+        <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.85"/>
+          <stop offset="100%" stop-color="#0284c7" stop-opacity="0.95"/>
+        </linearGradient>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2.5" result="blur"/>
+          <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+        </filter>
+      </defs>
+
+      <rect x="14" y="18" width="90" height="150" rx="10" fill="url(#ventGrad)" stroke="#64748b" stroke-width="2"/>
+      <rect x="22" y="28" width="74" height="48" rx="5" fill="#020617" stroke="#38bdf8" stroke-width="1.5"/>
+      <polyline points="26,42 36,42 42,33 50,42 62,42 68,33 76,42 92,42" fill="none" stroke="#facc15" stroke-width="1.5"/>
+      <polyline points="26,58 38,50 48,64 62,58 72,50 82,64 92,58" fill="none" stroke="#38bdf8" stroke-width="1.5"/>
+      <text x="59" y="92" fill="#e2e8f0" font-size="9.5" text-anchor="middle" font-weight="bold">ICU VENTILATOR</text>
+      <circle cx="96" cy="112" r="8" fill="#0284c7" stroke="#bae6fd" stroke-width="1.5"/>
+      <text x="68" y="115" fill="#7dd3fc" font-size="8.5" text-anchor="end">吸気口</text>
+      <circle cx="96" cy="145" r="8" fill="#15803d" stroke="#bbf7d0" stroke-width="1.5"/>
+      <text x="68" y="148" fill="#86efac" font-size="8.5" text-anchor="end">呼気口</text>
+
+      <rect x="132" y="88" width="38" height="32" rx="4" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5"/>
+      <rect x="134" y="106" width="34" height="12" fill="url(#waterGrad)"/>
+      <rect x="128" y="120" width="46" height="5" rx="2" fill="#ef4444"/>
+      <text x="151" y="135" fill="#fca5a5" font-size="8" text-anchor="middle">加温加湿器</text>
+
+      <path d="M 104 112 L 132 102 M 170 100 Q 225 52, 285 82" fill="none" stroke="#0284c7" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 104 112 L 132 102 M 170 100 Q 225 52, 285 82" fill="none" stroke="#38bdf8" stroke-width="4" stroke-dasharray="4,4"/>
+
+      <path d="M 285 92 Q 245 148, 212 148 Q 160 148, 104 145" fill="none" stroke="#15803d" stroke-width="8" stroke-linecap="round"/>
+      <path d="M 285 92 Q 245 148, 212 148 Q 160 148, 104 145" fill="none" stroke="#4ade80" stroke-width="4" stroke-dasharray="4,4"/>
+
+      <rect x="196" y="142" width="30" height="40" rx="5" fill="#0f172a" stroke="#94a3b8" stroke-width="1.5"/>
+      <rect id="svgWaterTrap" x="198" y="166" width="26" height="14" rx="2" fill="url(#waterGrad)" opacity="0.45"/>
+      <text x="211" y="194" fill="#94a3b8" font-size="8.5" text-anchor="middle">ウォータートラップ</text>
+
+      <g id="svgBubbles" opacity="0">
+        <circle cx="195" cy="136" r="4.5" fill="#38bdf8"/>
+        <circle cx="211" cy="140" r="5.5" fill="#7dd3fc"/>
+        <circle cx="227" cy="134" r="4" fill="#38bdf8"/>
+        <circle cx="335" cy="87" r="4" fill="#facc15"/>
+        <circle cx="350" cy="85" r="3.5" fill="#facc15"/>
+        <rect x="150" y="112" width="125" height="18" rx="4" fill="rgba(15,23,42,0.85)" stroke="#facc15"/>
+        <text x="212" y="124" fill="#facc15" font-size="9.5" text-anchor="middle" font-weight="bold">💧 結露水・貯留痰の振動!</text>
+      </g>
+
+      <path d="M 282 80 L 298 87 L 282 94" fill="none" stroke="#cbd5e1" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M 310 73 L 405 73 M 310 101 L 405 101" stroke="#f43f5e" stroke-width="3" stroke-dasharray="6,2"/>
+      <path id="svgTube" d="M 295 87 L 395 87" fill="none" stroke="#f8fafc" stroke-width="11" stroke-linecap="round"/>
+      <path id="svgTubeInner" d="M 295 87 L 395 87" fill="none" stroke="#0f172a" stroke-width="6.5"/>
+      <ellipse id="svgCuff" cx="372" cy="87" rx="11" ry="13" fill="rgba(56, 189, 248, 0.42)" stroke="#38bdf8" stroke-width="1.8"/>
+      <path d="M 368 76 Q 345 55, 325 55" fill="none" stroke="#38bdf8" stroke-width="1.2"/>
+      <ellipse id="svgPilotBalloon" cx="320" cy="55" rx="7" ry="4.5" fill="#0284c7" stroke="#bae6fd" stroke-width="1"/>
+      <text x="348" y="42" fill="#cbd5e1" font-size="9" text-anchor="middle">気管チューブ・カフ</text>
+
+      <g id="svgLeakEffect" opacity="0">
+        <path d="M 372 72 L 340 62 M 372 102 L 340 112 M 355 70 L 325 65" stroke="#f87171" stroke-width="2.5" stroke-dasharray="4,2"/>
+        <rect x="285" y="18" width="128" height="20" rx="5" fill="rgba(127,29,29,0.9)" stroke="#f87171"/>
+        <text x="349" y="32" fill="#fca5a5" font-size="10" text-anchor="middle" font-weight="bold">💨 カフ・回路エアリーク!</text>
+      </g>
+
+      <g id="svgStenosisEffect" opacity="0">
+        <polygon points="335,71 347,71 341,84" fill="#ef4444"/>
+        <polygon points="335,103 347,103 341,90" fill="#ef4444"/>
+        <rect x="282" y="108" width="125" height="19" rx="4" fill="rgba(127,29,29,0.9)" stroke="#f87171"/>
+        <text x="344" y="121" fill="#fca5a5" font-size="9.5" text-anchor="middle" font-weight="bold">⚡ 狭窄・高気道抵抗(R↑)</text>
+      </g>
+
+      <g id="svgLungGroup" transform="translate(475, 92)">
+        <ellipse cx="0" cy="0" rx="68" ry="64" fill="rgba(30, 41, 59, 0.45)" stroke="#475569" stroke-width="2" stroke-dasharray="5,3"/>
+        <path d="M -80 -5 L -35 -5 M -35 -5 L -10 -24 M -35 -5 L -10 18" fill="none" stroke="#e2e8f0" stroke-width="6" stroke-linecap="round"/>
+        <g id="svgLungScale" transform="scale(1, 1)">
+          <path id="svgLungUpper" d="M -25 -12 C -25 -52, 42 -54, 48 -10 C 50 5, -20 5, -25 -12 Z" fill="url(#lungGrad)" stroke="#f43f5e" stroke-width="2.5"/>
+          <path id="svgLungLower" d="M -22 8 C -20 48, 45 52, 50 12 C 52 -4, -18 -2, -22 8 Z" fill="url(#lungGrad)" stroke="#f43f5e" stroke-width="2.5"/>
+        </g>
+        <text x="14" y="-14" fill="#ffe4e6" font-size="10.5" text-anchor="middle" font-weight="bold">肺胞 (C)</text>
+        <text id="svgLungSubText" x="14" y="22" fill="#facc15" font-size="9.5" text-anchor="middle" font-weight="bold"></text>
+      </g>
+
+      <path id="svgDiaphragm" d="M 552 30 Q 526 92, 552 156" fill="none" stroke="#fb923c" stroke-width="7" stroke-linecap="round"/>
+      <text x="598" y="88" fill="#fb923c" font-size="10.5" text-anchor="middle" font-weight="bold">横隔膜</text>
+      <text id="svgEffortBadge" x="598" y="105" fill="#94a3b8" font-size="9" text-anchor="middle">自発吸気努力</text>
+
+      <circle id="svgFlowDot" cx="180" cy="80" r="5.5" fill="#facc15" filter="url(#glow)"/>
+    </svg>
+  `;
+}
+
+/**
+ * 症例および正常状態の呼吸周期（秒）をバイタル表示の呼吸回数（fTOT）に合わせて取得
+ */
+/**
+ * 症例および正常状態の呼吸周期（秒）を取得
+ * ※「正常比較(実線): ON」のときは異常波形と周期を完全同期させ、山の位置ズレを防ぐ
+ */
+function getCyclePeriodSec(animType, isResolvedState) {
+  if (isResolvedState || animType === "normal") return 4.0; // 介入成功後は15回/min(4.0秒)
+  switch (animType) {
+    case "missed_trigger":    return 5.0;   // 送気12回/min（＋呼気相に無効努力）
+    case "auto_trigger":      return 4.28;  // 正常1呼吸(4.28秒)の中に誤トリガー換気2拍(各2.14秒=28回/min)が入る周期
+    case "double_trigger":    return 4.0;   // 15サイクル中に二段呼吸が入る
+    case "reverse_trigger":   return 3.0;   // 20回/min
+    case "sagging":           return 2.73;  // 22回/min
+    case "premature_cycling": return 3.33;  // 18回/min
+    case "delayed_cycling":   return 3.75;  // 16回/min
+    case "auto_peep":         return 2.5;   // 24回/min
+    case "high_resistance":   return 4.0;   // 15回/min
+    case "low_compliance":    return 3.33;  // 18回/min
+    case "air_leak":          return 4.0;   // 15回/min
+    case "saw_tooth":         return 3.75;  // 16回/min
+    default:                  return 4.0;
+  }
+}
+
+/**
+ * 波形データの計算（正常比較オーバーレイの白実線と異常波形の骨格・位相を完全同期）
+ */
+function computeBreathWaveforms(tSec, animType, forceNormal, mode, ctrl) {
+  const isNormalWave = Boolean(forceNormal || animType === "normal");
+  // 介入成功後(isResolved)のみ4.0秒周期に戻し、比較オーバーレイ中は異常波形と周期を完全一致させる
+  const cyclePeriod = getCyclePeriodSec(animType, isResolved);
+  const breathIndex = Math.floor(tSec / cyclePeriod);
+  const ph = (tSec % cyclePeriod) / cyclePeriod;
+
+  const isSimvPsBreath = (mode === "SIMV" && (breathIndex % 2 === 1) && (isNormalWave || animType !== "auto_trigger"));
+  const isSpontPs = (mode === "CPAP_PS" || isSimvPsBreath);
+  const useVcvShape = (ctrl === "VCV" && !isSpontPs);
+
+  // 症例ごとの設定PEEP（ダブルトリガーとコンプライアンス低下は比較時も8.0に揃えて基線ズレを防ぐ）
+  const basePeep = (!isResolved && (animType === "double_trigger" || animType === "low_compliance")) ? 8.0 : 5.0;
+
+  function getBaseInsp(ip, targetPeakP, targetVt, hasTriggerDip, customPeep) {
+    const peepVal = (customPeep !== undefined) ? customPeep : basePeep;
+    const dip = hasTriggerDip && ip < 0.14 ? -2.2 * Math.sin((ip / 0.14) * Math.PI) : 0;
+    const eff = hasTriggerDip && ip < 0.35 ? Math.sin((ip / 0.35) * Math.PI) * 0.65 : 0;
+    if (useVcvShape) {
+      return {
+        paw: peepVal + dip + (targetPeakP - peepVal) * (0.32 + 0.68 * ip),
+        flow: 52,
+        vol: targetVt * ip,
+        effort: eff
+      };
+    } else {
+      const pGain = isSpontPs ? Math.max(peepVal + 9, targetPeakP - 3.5) : targetPeakP;
+      const vGain = isSpontPs ? (targetVt * 0.84) : targetVt;
+      return {
+        paw: peepVal + dip + (pGain - peepVal) * (1 - Math.exp(-ip * 9)),
+        flow: 66 * Math.exp(-ip * (isSpontPs ? 2.9 : 2.4)),
+        vol: vGain * (1 - Math.exp(-ip * 2.8)) / (1 - Math.exp(-2.8)),
+        effort: eff
+      };
+    }
+  }
+
+  // ① 正常波形（介入成功後 または 正常比較オーバーレイの白実線）
+  if (isNormalWave) {
+    // 3-2(気道抵抗上昇)のVCV比較用：吸気ポーズ付き正常波形（Ppeak 22 / Pplat 20）
+    if (useVcvShape && animType === "high_resistance" && !isResolved) {
+      if (ph < 0.25) {
+        const ip = ph / 0.25;
+        return { paw: 8.0 + 14.0 * ip, flow: 50, vol: 450 * ip, patientEffort: 0 };
+      } else if (ph < 0.33) {
+        return { paw: 20.0, flow: 0, vol: 450, patientEffort: 0 };
+      } else {
+        const ep = (ph - 0.33) / 0.67;
+        return { paw: 5.0, flow: -58 * Math.exp(-ep * 4.6), vol: 450 * Math.exp(-ep * 4.6), patientEffort: 0 };
+      }
+    }
+
+    // 3-3(コンプライアンス低下)のVCV比較用：吸気ポーズ付き正常波形（PEEP 8.0 / Ppeak 21 / Pplat 18 / VT 360）
+    if (useVcvShape && animType === "low_compliance" && !isResolved) {
+      if (ph < 0.25) {
+        const ip = ph / 0.25;
+        return { paw: 11.0 + 10.0 * ip, flow: 45, vol: 360 * ip, patientEffort: 0 };
+      } else if (ph < 0.33) {
+        return { paw: 18.0, flow: 0, vol: 360, patientEffort: 0 };
+      } else {
+        const ep = (ph - 0.33) / 0.67;
+        return { paw: 8.0, flow: -58 * Math.exp(-ep * 4.6), vol: 360 * Math.exp(-ep * 4.6), patientEffort: 0 };
+      }
+    }
+
+    // 2-1(サギング)のVCV比較用：異常波形と同じ流量(40)・換気量(400)で圧が凹まない正常台形波形
+    if (useVcvShape && animType === "sagging" && !isResolved) {
+      if (ph < 0.34) {
+        const ip = ph / 0.34;
+        const dip = ip < 0.12 ? -1.8 * Math.sin((ip / 0.12) * Math.PI) : 0;
+        return { paw: 5.0 + dip + 16.0 * (0.30 + 0.70 * ip), flow: 40, vol: 400 * ip, patientEffort: 0.3 };
+      } else {
+        const ep = (ph - 0.34) / 0.66;
+        return { paw: 5.0, flow: -55 * Math.exp(-ep * 4.4), vol: 400 * Math.exp(-ep * 4.4), patientEffort: 0 };
+      }
+    }
+
+    // 各症例の異常波形と吸気時間比率・ピーク圧・換気量・トリガー陰圧の有無を完全に揃える
+    let inspRatio = isSpontPs ? 0.28 : 0.30;
+    let peakTarget = useVcvShape ? 20 : 18;
+    let targetVt = 450;
+    let hasDip = isSpontPs;
+
+    if (!isResolved) {
+      if (animType === "missed_trigger") {
+        inspRatio = 0.26;
+        peakTarget = useVcvShape ? 20 : 18;
+        hasDip = isSpontPs;
+      } else if (animType === "auto_trigger") {
+        inspRatio = 0.20; // 4.28秒周期の前半1拍目(ph 0〜0.20)と完全に重なる吸気時間
+        peakTarget = 18;
+        targetVt = 440;
+        hasDip = false;
+      } else if (animType === "double_trigger") {
+        inspRatio = 0.32;
+        peakTarget = 21;
+        targetVt = 450;
+        hasDip = true;
+      } else if (animType === "reverse_trigger") {
+        inspRatio = 0.24;
+        peakTarget = useVcvShape ? 20 : 19;
+        targetVt = 360;
+        hasDip = false;
+      } else if (animType === "sagging") {
+        inspRatio = 0.32;
+        peakTarget = 17;
+        targetVt = 420;
+        hasDip = true;
+      } else if (animType === "premature_cycling") {
+        inspRatio = 0.32; // 本来あるべき十分な吸気時間（異常波形は0.20で早期終了）
+        peakTarget = useVcvShape ? 20 : 18;
+        targetVt = 450;
+        hasDip = true;
+      } else if (animType === "delayed_cycling") {
+        inspRatio = 0.28; // 本来終わるべき吸気時間（異常波形は0.44まで遅延）
+        peakTarget = 18;
+        targetVt = 440;
+        hasDip = isSpontPs;
+      } else if (animType === "auto_peep") {
+        inspRatio = 0.36;
+        peakTarget = useVcvShape ? 22 : 20;
+        targetVt = 480;
+        hasDip = isSpontPs;
+      } else if (animType === "high_resistance") {
+        inspRatio = 0.34;
+        peakTarget = isSpontPs ? 18 : 20;
+        targetVt = 450;
+        hasDip = isSpontPs;
+      } else if (animType === "low_compliance") {
+        inspRatio = 0.30;
+        peakTarget = isSpontPs ? 20 : 22;
+        targetVt = 450;
+        hasDip = isSpontPs;
+      } else if (animType === "air_leak") {
+        inspRatio = 0.30;
+        peakTarget = useVcvShape ? 16 : 15;
+        targetVt = 480;
+        hasDip = isSpontPs;
+      } else if (animType === "saw_tooth") {
+        inspRatio = 0.32;
+        peakTarget = useVcvShape ? 22 : 21;
+        targetVt = 440;
+        hasDip = isSpontPs;
+      }
+    }
+
+    if (ph < inspRatio) {
+      const ip = ph / inspRatio;
+      const b = getBaseInsp(ip, peakTarget, targetVt, hasDip, basePeep);
+      return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: b.effort };
+    } else {
+      const ep = (ph - inspRatio) / (1 - inspRatio);
+      const vMax = (isSpontPs && targetVt === 450) ? 380 : targetVt;
+      return {
+        paw: basePeep,
+        flow: -58 * Math.exp(-ep * 5.2),
+        vol: vMax * Math.exp(-ep * 5.2),
+        patientEffort: 0
+      };
+    }
+  }
+
+  // 1-1: ミストリガー（吸気は白実線と完全一致、呼気途中に無効吸気努力の凹み・凸が出現）
+  if (animType === "missed_trigger") {
+    if (ph < 0.26) {
+      const peakTarget = useVcvShape ? 20 : 18;
+      const b = getBaseInsp(ph / 0.26, peakTarget, 450, isSpontPs, 5.0);
+      return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: b.effort };
+    } else {
+      const ep = (ph - 0.26) / 0.74;
+      let paw = 5.0;
+      let flow = -58 * Math.exp(-ep * 5.2);
+      let vol = (isSpontPs ? 380 : 450) * Math.exp(-ep * 5.2);
+      let effort = 0;
+      if (ep > 0.42 && ep < 0.66) {
+        const bump = Math.sin(((ep - 0.42) / 0.24) * Math.PI);
+        effort = bump;
+        paw -= 3.5 * bump;
+        flow += 26 * bump;
+      }
+      return { paw, flow, vol, patientEffort: effort };
+    }
+  }
+
+  // 1-2: オートトリガー（1拍目は白実線と重なり、白実線が呼気中の ph>=0.50 で誤トリガーの2拍目が入る）
+  if (animType === "auto_trigger") {
+    const subPh = (ph * 2) % 1; // 1周期に2回換気（1拍目: ph 0〜0.5、2拍目: ph 0.5〜1.0）
+    const osc = Math.sin(tSec * 28) * 1.3;
+    if (subPh < 0.40) {
+      const b = getBaseInsp(subPh / 0.40, 18, 440, false, 5.0);
+      return { paw: b.paw + osc * 0.4, flow: b.flow + osc * 3, vol: b.vol, patientEffort: 0 };
+    } else {
+      const ep = (subPh - 0.40) / 0.60;
+      return {
+        paw: 5.0 + osc,
+        flow: -55 * Math.exp(-ep * 4.2) + osc * 5,
+        vol: 440 * Math.exp(-ep * 4.2),
+        patientEffort: 0
+      };
+    }
+  }
+
+  // 1-3: ダブルトリガー（1拍目の立ち上がりとPEEP 8.0が白実線と完全一致し、早期打ち切り直後に2段目が入る）
+  if (animType === "double_trigger") {
+    const v1Max = 380;
+    const v2Add = useVcvShape ? 380 : 300;
+    const vTot = v1Max + v2Add;
+    if (ph < 0.20) {
+      // 白実線(inspRatio=0.32, targetVt=450)の途中経過とピタッと重なるようスケーリング
+      const ipNorm = ph / 0.32;
+      const b = getBaseInsp(ipNorm, 21, 450, true, 8.0);
+      return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: 0.9 };
+    } else if (ph < 0.24) {
+      const tr = (ph - 0.20) / 0.04;
+      return {
+        paw: 8.0 - 3.5 * Math.sin(tr * Math.PI),
+        flow: -10 * (1 - tr),
+        vol: v1Max,
+        patientEffort: 1.0
+      };
+    } else if (ph < 0.46) {
+      const ip2 = (ph - 0.24) / 0.22;
+      const paw2 = useVcvShape ? (20 + 19 * ip2) : (8 + 16 * (1 - Math.exp(-ip2 * 8)));
+      const flow2 = useVcvShape ? 52 : 54 * Math.exp(-ip2 * 2.4);
+      const vol2 = useVcvShape
+        ? (v1Max + v2Add * ip2)
+        : (v1Max + v2Add * (1 - Math.exp(-ip2 * 2.4)) / (1 - Math.exp(-2.4)));
+      return { paw: paw2, flow: flow2, vol: vol2, patientEffort: 1.0 - ip2 };
+    } else {
+      const ep = (ph - 0.46) / 0.54;
+      return { paw: 8.0, flow: -76 * Math.exp(-ep * 4.5), vol: vTot * Math.exp(-ep * 4.5), patientEffort: 0 };
+    }
+  }
+
+  // 1-4: リバーストリガー（1拍目前半は白実線と100%一致し、吸気後半に圧陥凹＋2段目の送気が入る）
+  if (animType === "reverse_trigger") {
+    if (ph < 0.24) {
+      const ip1 = ph / 0.24;
+      const b = getBaseInsp(ip1, useVcvShape ? 20 : 19, 360, false, 5.0);
+      let eff = 0;
+      let extraVol = 0;
+      if (ip1 > 0.55) {
+        eff = (ip1 - 0.55) / 0.45;
+        b.paw -= 4.2 * Math.sin(eff * Math.PI * 0.85);
+        b.flow += 22 * eff;
+        extraVol = 30 * eff;
+      }
+      return { paw: b.paw, flow: b.flow, vol: b.vol + extraVol, patientEffort: eff };
+    } else if (ph < 0.46) {
+      const ip2 = (ph - 0.24) / 0.22;
+      const paw2 = useVcvShape
+        ? (17 + 14 * ip2)
+        : (14 + 10 * (1 - Math.exp(-ip2 * 7)));
+      const flow2 = useVcvShape ? 50 : 48 * Math.exp(-ip2 * 2.3);
+      const vol2 = useVcvShape
+        ? (390 + 190 * ip2)
+        : (390 + 190 * (1 - Math.exp(-ip2 * 2.3)) / (1 - Math.exp(-2.3)));
+      return { paw: paw2, flow: flow2, vol: vol2, patientEffort: Math.max(0, 1.0 - ip2 * 1.2) };
+    } else {
+      const ep = (ph - 0.46) / 0.54;
+      return { paw: 5.0, flow: -66 * Math.exp(-ep * 4.5), vol: 580 * Math.exp(-ep * 4.5), patientEffort: 0 };
+    }
+  }
+
+  // 2-1: サギング（流量・換気量・吸気前後の端点は白実線と100%一致し、吸気中央の圧だけがM字に凹む）
+  if (animType === "sagging") {
+    if (isSpontPs) {
+      if (ph < 0.32) {
+        const ip = ph / 0.32;
+        const b = getBaseInsp(ip, 17, 420, true, 5.0);
+        return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: b.effort };
+      } else {
+        const ep = (ph - 0.32) / 0.68;
+        return { paw: 5.0, flow: -58 * Math.exp(-ep * 5.2), vol: 353 * Math.exp(-ep * 5.2), patientEffort: 0 };
+      }
+    }
+    if (ph < 0.34) {
+      const ip = ph / 0.34;
+      const dip = ip < 0.12 ? -1.8 * Math.sin((ip / 0.12) * Math.PI) : 0;
+      const normalPaw = 5.0 + dip + 16.0 * (0.30 + 0.70 * ip);
+      const eff = Math.sin(ip * Math.PI);
+      const scoop = 12.0 * Math.pow(eff, 1.4);
+      return {
+        paw: normalPaw - scoop,
+        flow: 40,
+        vol: 400 * ip,
+        patientEffort: eff
+      };
+    } else {
+      const ep = (ph - 0.34) / 0.66;
+      return { paw: 5.0, flow: -55 * Math.exp(-ep * 4.4), vol: 400 * Math.exp(-ep * 4.4), patientEffort: 0 };
+    }
+  }
+
+  // 2-2: 送気の早期終了（ph 0〜0.20までは白実線と1本の線に重なり、0.20で早く切れて呼気初期に凸が出る）
+  if (animType === "premature_cycling") {
+    const peakP = useVcvShape ? 20 : 18;
+    // ph=0.20時点での白実線(inspRatio=0.32)の到達換気量を算出して連続させる
+    const bEnd = getBaseInsp(0.20 / 0.32, peakP, 450, true, 5.0);
+    const vAtCut = bEnd.vol;
+
+    if (ph < 0.20) {
+      const ipNorm = ph / 0.32;
+      const b = getBaseInsp(ipNorm, peakP, 450, true, 5.0);
+      return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: 0.85 };
+    } else {
+      const ep = (ph - 0.20) / 0.80;
+      if (ep < 0.20) {
+        const subEp = ep / 0.20;
+        const rem = Math.sin(subEp * Math.PI);
+        return {
+          paw: 5.0 - 3.2 * rem,
+          flow: -42 + 54 * rem,
+          vol: vAtCut - 28 * subEp + 10 * rem,
+          patientEffort: rem
+        };
+      } else {
+        const ep2 = (ep - 0.20) / 0.80;
+        return { paw: 5.0, flow: -48 * Math.exp(-ep2 * 4.5), vol: (vAtCut - 28) * Math.exp(-ep2 * 4.5), patientEffort: 0 };
+      }
+    }
+  }
+
+  // 2-3: 送気の終了遅延（ph 0〜0.28までは白実線と完全一致し、0.28〜0.44まで送気が伸びて最後に圧スパイク）
+  if (animType === "delayed_cycling") {
+    if (ph < 0.28) {
+      const ip = ph / 0.28;
+      const b = getBaseInsp(ip, 18, 440, isSpontPs, 5.0);
+      return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: b.effort };
+    } else if (ph < 0.44) {
+      const sp = (ph - 0.28) / 0.16; // 白実線が呼気に入った後も送気が継続している区間
+      const bEnd = getBaseInsp(1.0, 18, 440, isSpontPs, 5.0);
+      const activeExh = Math.sin(sp * Math.PI * 0.9);
+      const extraVol = (isSpontPs ? 50 : 60) * (1 - Math.exp(-sp * 2.5));
+      return {
+        paw: bEnd.paw + 8.0 * activeExh,
+        flow: Math.max(2, bEnd.flow * (1 - 0.88 * sp)),
+        vol: bEnd.vol + extraVol,
+        patientEffort: activeExh * 0.85,
+        isExhEffort: true
+      };
+    } else {
+      const ep = (ph - 0.44) / 0.56;
+      const vPeak = (isSpontPs ? Math.round(440 * 0.84) + 50 : 500) * (1 - Math.exp(-2.5));
+      return { paw: 5.0, flow: -62 * Math.exp(-ep * 4.6), vol: vPeak * Math.exp(-ep * 4.6), patientEffort: 0 };
+    }
+  }
+
+  // 3-1: オートPEEP（吸気・呼気の切り替わり位置は白実線と一致し、呼気フローだけが0に戻りきらない）
+  if (animType === "auto_peep") {
+    if (ph < 0.36) {
+      const peakP = useVcvShape ? 26 : 24;
+      const b = getBaseInsp(ph / 0.36, peakP, 480, isSpontPs, 5.0);
+      return { paw: b.paw, flow: b.flow, vol: b.vol, patientEffort: b.effort };
+    } else {
+      const ep = (ph - 0.36) / 0.64;
+      const flow = -42 * Math.exp(-ep * 0.95);
+      const vMax = isSpontPs ? (480 * 0.84) : 480;
+      const vol = vMax * Math.max(0, (Math.exp(-ep * 2.1) - Math.exp(-2.1)) / (1 - Math.exp(-2.1)));
+      return { paw: 5.0, flow, vol, patientEffort: 0 };
+    }
+  }
+
+  // 3-2: 気道抵抗の上昇（VCVではプラトー圧と換気量が白実線と重なりPpeakのみ急上昇、PCVでは圧が重なり流量・換気量が低下）
+  if (animType === "high_resistance") {
+    if (useVcvShape) {
+      if (ph < 0.25) {
+        const ip = ph / 0.25;
+        return { paw: 23 + 15 * ip, flow: 50, vol: 450 * ip, patientEffort: 0 };
+      } else if (ph < 0.33) {
+        return { paw: 20.0, flow: 0, vol: 450, patientEffort: 0 };
+      } else {
+        const ep = (ph - 0.33) / 0.67;
+        return { paw: 5.0, flow: -26 * Math.exp(-ep * 1.7), vol: 450 * Math.exp(-ep * 2.2), patientEffort: 0 };
+      }
+    } else {
+      if (ph < 0.34) {
+        const ip = ph / 0.34;
+        const normB = getBaseInsp(ip, isSpontPs ? 18 : 20, 450, isSpontPs, 5.0);
+        return {
+          paw: normB.paw, // 気道内圧は白実線と完全一致
+          flow: 34 * Math.exp(-ip * 1.3),
+          vol: 320 * (1 - Math.exp(-ip * 1.5)) / (1 - Math.exp(-1.5)),
+          patientEffort: normB.effort
+        };
+      } else {
+        const ep = (ph - 0.34) / 0.66;
+        return { paw: 5.0, flow: -25 * Math.exp(-ep * 1.7), vol: 320 * Math.exp(-ep * 2.2), patientEffort: 0 };
+      }
+    }
+  }
+
+  // 3-3: コンプライアンスの低下（PEEP 8.0と吸気時間が白実線と完全一致）
+  if (animType === "low_compliance") {
+    if (useVcvShape) {
+      if (ph < 0.25) {
+        const ip = ph / 0.25;
+        return { paw: 13 + 24 * ip, flow: 45, vol: 360 * ip, patientEffort: 0 };
+      } else if (ph < 0.33) {
+        return { paw: 32.0, flow: 0, vol: 360, patientEffort: 0 };
+      } else {
+        const ep = (ph - 0.33) / 0.67;
+        return { paw: 8.0, flow: -72 * Math.exp(-ep * 7.0), vol: 360 * Math.exp(-ep * 7.0), patientEffort: 0 };
+      }
+    } else {
+      if (ph < 0.30) {
+        const ip = ph / 0.30;
+        const normB = getBaseInsp(ip, isSpontPs ? 20 : 22, 450, isSpontPs, 8.0);
+        return {
+          paw: normB.paw, // 気道内圧は白実線と完全一致
+          flow: 52 * Math.exp(-ip * 6.5),
+          vol: 260 * (1 - Math.exp(-ip * 6.5)) / (1 - Math.exp(-6.5)),
+          patientEffort: normB.effort
+        };
+      } else {
+        const ep = (ph - 0.30) / 0.70;
+        return { paw: 8.0, flow: -58 * Math.exp(-ep * 7.0), vol: 260 * Math.exp(-ep * 7.0), patientEffort: 0 };
+      }
+    }
+  }
+
+  // 4-1: エアリーク（吸気換気量は白実線とピタッと重なり、呼気換気量だけがゼロに戻らず途中で水平になる）
+  if (animType === "air_leak") {
+    if (ph < 0.30) {
+      const peakP = useVcvShape ? 16 : 15;
+      const b = getBaseInsp(ph / 0.30, peakP, 480, isSpontPs, 4.2);
+      const normB = getBaseInsp(ph / 0.30, peakP, 480, isSpontPs, 5.0);
+      return { paw: b.paw, flow: b.flow, vol: normB.vol, patientEffort: b.effort };
+    } else {
+      const ep = (ph - 0.30) / 0.70;
+      const vMax = isSpontPs ? (480 * 0.84) : 480;
+      const leakRem = vMax * 0.5;
+      return {
+        paw: 4.2,
+        flow: -26 * Math.exp(-ep * 4.8),
+        vol: leakRem + (vMax - leakRem) * Math.exp(-ep * 4.8),
+        patientEffort: 0
+      };
+    }
+  }
+
+  // 4-2: 回路内結露・分泌物（ベース曲線は白実線と100%同一で、その上にノコギリ波の振動だけが乗る）
+  if (animType === "saw_tooth") {
+    const saw = Math.sin(tSec * 68) * 2.3 + Math.cos(tSec * 96) * 1.5;
+    if (ph < 0.32) {
+      const peakP = useVcvShape ? 22 : 21;
+      const b = getBaseInsp(ph / 0.32, peakP, 440, isSpontPs, 5.0);
+      return { paw: b.paw + saw * 0.75, flow: b.flow + saw * 5.8, vol: b.vol, patientEffort: b.effort };
+    } else {
+      const ep = (ph - 0.32) / 0.68;
+      const vMax = isSpontPs ? (440 * 0.84) : 440;
+      return {
+        paw: 5.0 + saw * 0.55,
+        flow: -58 * Math.exp(-ep * 5.2) + saw * 6.5,
+        vol: vMax * Math.exp(-ep * 5.2),
+        patientEffort: 0
+      };
+    }
+  }
+
+  return { paw: 5, flow: 0, vol: 0, patientEffort: 0 };
+}
+
+function renderLoop() {
+  const sc = SCENARIOS[currentScenarioIndex];
+  if (!isPaused) {
+    animTime += 0.024;
+    if (sc) {
+      const nowW = computeBreathWaveforms(animTime, sc.animType, isResolved, currentMode, currentCtrl);
+      const speedFactor = Math.min(2.2, Math.max(0, Math.abs(nowW.flow) / 42));
+      flowDotPhase = (flowDotPhase + 0.022 * speedFactor) % 1;
+    }
+  }
+
+  if (waveCanvas && ctx && sc) {
+    drawAllGraphs(sc.animType, canvasLogicalW, canvasLogicalH);
+    updateSVGAnimation(sc.animType);
+  }
+
+  requestAnimationFrame(renderLoop);
+}
+
+function drawAllGraphs(animType, W, H) {
+  ctx.clearRect(0, 0, W, H);
+
+  const tH = (H - 22) / 3;
+  const tracks = [
+    { label: "Paw (気道内圧)", unit: "cmH2O", top: 6, height: tH - 4, min: -10, max: 45, zeroVal: 0, color: "#facc15", key: "paw" },
+    { label: "Flow (流量)", unit: "L/min", top: tH + 8, height: tH - 4, min: -90, max: 90, zeroVal: 0, color: "#38bdf8", key: "flow" },
+    { label: "Volume (換気量)", unit: "mL", top: tH * 2 + 10, height: tH - 4, min: -50, max: 850, zeroVal: 0, color: "#4ade80", key: "vol" }
+  ];
+
+  const leftPad = 46;
+  const plotW = Math.max(100, W - leftPad - 10);
+  const timeWindow = 9.6;
+
+  tracks.forEach(tr => {
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(leftPad, tr.top, plotW, tr.height);
+
+    const zeroY = tr.top + tr.height - ((tr.zeroVal - tr.min) / (tr.max - tr.min)) * tr.height;
+    ctx.strokeStyle = "#475569";
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(leftPad, zeroY);
+    ctx.lineTo(leftPad + plotW, zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = tr.color;
+    ctx.font = "bold 11px sans-serif";
+    ctx.fillText(`${tr.label} [${tr.unit}]`, leftPad + 6, tr.top + 14);
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "9.5px monospace";
+    ctx.fillText(tr.max, 4, tr.top + 10);
+    ctx.fillText(tr.zeroVal, 10, zeroY + 3);
+    ctx.fillText(tr.min, 4, tr.top + tr.height - 2);
+
+    if (isNormalOverlay && !isResolved) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for (let x = 0; x <= plotW; x += 2) {
+        const sampleTime = animTime - timeWindow + (x / plotW) * timeWindow;
+        const valObj = computeBreathWaveforms(Math.max(0, sampleTime), animType, true, currentMode, currentCtrl);
+        const val = valObj[tr.key];
+        const y = tr.top + tr.height - ((val - tr.min) / (tr.max - tr.min)) * tr.height;
+        const clampedY = Math.max(tr.top + 2, Math.min(tr.top + tr.height - 2, y));
+        if (x === 0) ctx.moveTo(leftPad + x, clampedY);
+        else ctx.lineTo(leftPad + x, clampedY);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.strokeStyle = tr.color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let x = 0; x <= plotW; x += 1.5) {
+      const sampleTime = animTime - timeWindow + (x / plotW) * timeWindow;
+      const valObj = computeBreathWaveforms(Math.max(0, sampleTime), animType, isResolved, currentMode, currentCtrl);
+      const val = valObj[tr.key];
+      const y = tr.top + tr.height - ((val - tr.min) / (tr.max - tr.min)) * tr.height;
+      const clampedY = Math.max(tr.top + 2, Math.min(tr.top + tr.height - 2, y));
+      if (x === 0) ctx.moveTo(leftPad + x, clampedY);
+      else ctx.lineTo(leftPad + x, clampedY);
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+/**
+ * 2次ベジェ曲線上の座標を計算
+ */
+function quadBezierPoint(t, x0, y0, x1, y1, x2, y2) {
+  const u = 1 - t;
+  return {
+    x: u * u * x0 + 2 * u * t * x1 + t * t * x2,
+    y: u * u * y0 + 2 * u * t * y1 + t * t * y2
+  };
+}
+
+/**
+ * 吸気回路・呼気回路の曲線パスに沿ったガス移動ドットの座標を取得
+ */
+function getCircuitDotPosition(prog, isInspiration) {
+  if (isInspiration) {
+    // 吸気口(104,112) → 加温加湿器 → 吸気蛇管ベジェ(170,100 -> 225,52 -> 285,82) → 気管チューブ(295,87 -> 395,87)
+    if (prog < 0.15) {
+      const t = prog / 0.15;
+      return { x: 104 + 28 * t, y: 112 - 10 * t };
+    } else if (prog < 0.68) {
+      const t = (prog - 0.15) / 0.53;
+      return quadBezierPoint(t, 170, 100, 225, 52, 285, 82);
+    } else {
+      const t = (prog - 0.68) / 0.32;
+      return { x: 285 + 110 * t, y: 87 };
+    }
+  } else {
+    // 気管チューブ(395,87 -> 285,87) → 呼気蛇管ベジェ1(285,92 -> 245,148 -> 212,148) → ベジェ2(212,148 -> 160,148 -> 104,145)
+    if (prog < 0.28) {
+      const t = prog / 0.28;
+      return { x: 395 - 110 * t, y: 87 };
+    } else if (prog < 0.64) {
+      const t = (prog - 0.28) / 0.36;
+      return quadBezierPoint(t, 285, 92, 245, 148, 212, 148);
+    } else {
+      const t = (prog - 0.64) / 0.36;
+      return quadBezierPoint(t, 212, 148, 160, 148, 104, 145);
+    }
+  }
+}
+
+function updateSVGAnimation(animType) {
+  const nowWave = computeBreathWaveforms(animTime, animType, isResolved, currentMode, currentCtrl);
+  const type = isResolved ? "normal" : animType;
+
+  const svgLungScale = document.getElementById("svgLungScale");
+  const svgLungUpper = document.getElementById("svgLungUpper");
+  const svgLungLower = document.getElementById("svgLungLower");
+  const svgLungSubText = document.getElementById("svgLungSubText");
+  const svgDiaphragm = document.getElementById("svgDiaphragm");
+  const svgEffortBadge = document.getElementById("svgEffortBadge");
+  const svgFlowDot = document.getElementById("svgFlowDot");
+  const svgLeakEffect = document.getElementById("svgLeakEffect");
+  const svgCuff = document.getElementById("svgCuff");
+  const svgPilotBalloon = document.getElementById("svgPilotBalloon");
+  const svgStenosisEffect = document.getElementById("svgStenosisEffect");
+  const svgBubbles = document.getElementById("svgBubbles");
+  const svgWaterTrap = document.getElementById("svgWaterTrap");
+
+  if (!svgLungScale) return;
+
+  // オートPEEP時は呼気終末でも肺が過膨張している様子を表現
+  const baseScale = (type === "auto_peep") ? 0.98 : 0.88;
+  const scaleVal = baseScale + Math.max(0, Math.min(1.5, nowWave.vol / 450)) * 0.28;
+  svgLungScale.setAttribute("transform", `scale(${scaleVal.toFixed(2)}, ${scaleVal.toFixed(2)})`);
+
+  const strokeW = (type === "low_compliance") ? "5.5" : "2.5";
+  if (svgLungUpper) svgLungUpper.setAttribute("stroke-width", strokeW);
+  if (svgLungLower) svgLungLower.setAttribute("stroke-width", strokeW);
+
+  if (svgLungSubText) {
+    if (type === "low_compliance") svgLungSubText.textContent = "硬化肺 (C↓・高Pplat)";
+    else if (type === "auto_peep") svgLungSubText.textContent = "過膨張 (Auto-PEEP)";
+    else svgLungSubText.textContent = isResolved ? "同調・換気良好" : "";
+  }
+
+  const isExhEffort = Boolean(nowWave.isExhEffort && nowWave.patientEffort > 0.15);
+  const pull = isExhEffort ? (-nowWave.patientEffort * 18) : (nowWave.patientEffort * 26);
+  if (svgDiaphragm) {
+    svgDiaphragm.setAttribute("d", `M 552 30 Q ${526 + pull} 92, 552 156`);
+  }
+  if (svgEffortBadge) {
+    if (isExhEffort) {
+      svgEffortBadge.textContent = "💥 呼気努力(腹筋収縮)!";
+      svgEffortBadge.setAttribute("fill", "#f87171");
+    } else if (nowWave.patientEffort > 0.2) {
+      svgEffortBadge.textContent = "⚡ 吸気努力あり!";
+      svgEffortBadge.setAttribute("fill", "#facc15");
+    } else {
+      svgEffortBadge.textContent = "自発吸気努力";
+      svgEffortBadge.setAttribute("fill", "#94a3b8");
+    }
+  }
+
+  // 回路内のガス移動ドット（ホースのベジェ曲線に沿って移動し、ポーズ・無気流時は停止）
+  if (svgFlowDot) {
+    if (Math.abs(nowWave.flow) < 1.5) {
+      svgFlowDot.setAttribute("opacity", "0.25");
+    } else if (nowWave.flow >= 1.5) {
+      const pos = getCircuitDotPosition(flowDotPhase, true);
+      svgFlowDot.setAttribute("opacity", "1");
+      svgFlowDot.setAttribute("cx", pos.x.toFixed(1));
+      svgFlowDot.setAttribute("cy", pos.y.toFixed(1));
+      svgFlowDot.setAttribute("fill", "#38bdf8");
+    } else {
+      const pos = getCircuitDotPosition(flowDotPhase, false);
+      svgFlowDot.setAttribute("opacity", "1");
+      svgFlowDot.setAttribute("cx", pos.x.toFixed(1));
+      svgFlowDot.setAttribute("cy", pos.y.toFixed(1));
+      svgFlowDot.setAttribute("fill", "#4ade80");
+    }
+  }
+
+  const isLeak = (type === "air_leak");
+  if (svgLeakEffect) svgLeakEffect.setAttribute("opacity", isLeak ? "1" : "0");
+  if (svgCuff) {
+    svgCuff.setAttribute("ry", isLeak ? "8.5" : "13");
+    svgCuff.setAttribute("fill", isLeak ? "rgba(248, 113, 113, 0.22)" : "rgba(56, 189, 248, 0.42)");
+    svgCuff.setAttribute("stroke", isLeak ? "#f87171" : "#38bdf8");
+  }
+  if (svgPilotBalloon) {
+    svgPilotBalloon.setAttribute("ry", isLeak ? "2.5" : "4.5");
+  }
+
+  if (svgStenosisEffect) svgStenosisEffect.setAttribute("opacity", type === "high_resistance" ? "1" : "0");
+  if (svgBubbles) {
+    const showBubble = (type === "saw_tooth" || type === "auto_trigger");
+    svgBubbles.setAttribute("opacity", showBubble ? "1" : "0");
+    if (showBubble) {
+      const jitter = Math.sin(animTime * 42) * 2.5;
+      svgBubbles.setAttribute("transform", `translate(0, ${jitter})`);
+    }
+  }
+  if (svgWaterTrap) {
+    const highWater = (type === "saw_tooth" || type === "auto_trigger");
+    svgWaterTrap.setAttribute("y", highWater ? "150" : "166");
+    svgWaterTrap.setAttribute("height", highWater ? "30" : "14");
+    svgWaterTrap.setAttribute("opacity", highWater ? "0.9" : "0.45");
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => {
+    resizeCanvasSafely();
+    initSimulator();
+  });
+} else {
+  resizeCanvasSafely();
+  initSimulator();
+}
+</script>
+<!-- ▼▼▼ 画面サイズ選択画面（6インチ・10インチ・22インチ・自動）＆自動調整コード ▼▼▼ -->
+<style>
+  /* 画面上部のサイズ切替バー */
+  .screen-size-bar {
+    background: #0f172a;
+    border: 1px solid #38bdf8;
+    border-radius: 8px;
+    padding: 6px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .screen-size-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #7dd3fc;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .screen-size-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .ss-btn {
+    min-height: 30px;
+    padding: 4px 10px;
+    font-size: 0.76rem;
+    font-weight: 700;
+    border-radius: 6px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: #cbd5e1;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .ss-btn.active {
+    background: #0284c7;
+    border-color: #38bdf8;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.45);
+  }
+
+  /* 起動時の画面サイズ選択モーダル */
+  .ss-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .ss-modal-backdrop.hidden {
+    display: none;
+  }
+  .ss-modal-card {
+    background: #1e293b;
+    border: 2px solid #38bdf8;
+    border-radius: 14px;
+    max-width: 560px;
+    width: 100%;
+    padding: 20px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+  }
+  .ss-modal-header {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .ss-modal-sub {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .ss-modal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .ss-choice-card {
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 14px 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: 0.18s;
+  }
+  .ss-choice-card:hover {
+    border-color: #38bdf8;
+    background: rgba(2, 132, 199, 0.18);
+    transform: translateY(-2px);
+  }
+  .ss-choice-icon { font-size: 1.6rem; }
+  .ss-choice-name { font-size: 0.92rem; font-weight: 800; color: #f8fafc; }
+  .ss-choice-desc { font-size: 0.72rem; color: #94a3b8; text-align: center; }
+
+  @media (max-width: 520px) {
+    .ss-modal-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ① 自動モード時のレスポンシブ設定 */
+  html[data-screen-mode="auto"],
+  html[data-screen-mode="auto"] body {
+    font-size: clamp(13px, 0.45vw + 11.5px, 18px);
+  }
+  @media (max-width: 640px) {
+    html[data-screen-mode="auto"] .canvas-container { height: clamp(270px, 46vh, 340px); }
+    html[data-screen-mode="auto"] .patient-svg-wrap { height: clamp(145px, 24vh, 175px); }
+  }
+  @media (min-width: 641px) and (max-width: 1199px) {
+    html[data-screen-mode="auto"] .sim-grid { grid-template-columns: 1fr; }
+    html[data-screen-mode="auto"] .canvas-container { height: clamp(340px, 44vh, 420px); }
+    html[data-screen-mode="auto"] .patient-svg-wrap { height: clamp(175px, 23vh, 210px); }
+  }
+  @media (min-width: 1200px) {
+    html[data-screen-mode="auto"] .sim-wrapper { max-width: min(96vw, 1840px); }
+    html[data-screen-mode="auto"] .sim-grid { grid-template-columns: 1.38fr 1fr; gap: 18px; }
+    html[data-screen-mode="auto"] .canvas-container { height: clamp(440px, 56vh, 600px); }
+    html[data-screen-mode="auto"] .patient-svg-wrap { height: clamp(190px, 23vh, 245px); }
+  }
+
+  /* ② 6インチ（スマホ）モード選択時のスタイル */
+  html[data-screen-mode="6inch"],
+  html[data-screen-mode="6inch"] body {
+    font-size: 13.5px;
+  }
+  html[data-screen-mode="6inch"] .sim-wrapper {
+    max-width: 430px;
+  }
+  html[data-screen-mode="6inch"] .sim-grid {
+    grid-template-columns: 1fr;
+  }
+  html[data-screen-mode="6inch"] .controls-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  html[data-screen-mode="6inch"] .controls-grid > .ctrl-box:first-child {
+    grid-column: span 1;
+  }
+  html[data-screen-mode="6inch"] .mode-selector-group {
+    flex-direction: column;
+    gap: 6px;
+  }
+  html[data-screen-mode="6inch"] #ctrlSegGroup {
+    max-width: 100% !important;
+  }
+  html[data-screen-mode="6inch"] .vitals-strip {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 5px;
+    padding: 6px;
+  }
+  html[data-screen-mode="6inch"] .vital-box:nth-child(1),
+  html[data-screen-mode="6inch"] .vital-box:nth-child(2),
+  html[data-screen-mode="6inch"] .vital-box:nth-child(3) {
+    grid-column: span 2;
+  }
+  html[data-screen-mode="6inch"] .vital-box:nth-child(4),
+  html[data-screen-mode="6inch"] .vital-box:nth-child(5) {
+    grid-column: span 3;
+  }
+  html[data-screen-mode="6inch"] .vital-val { font-size: 0.95rem; }
+  html[data-screen-mode="6inch"] .canvas-container { height: 300px; }
+  html[data-screen-mode="6inch"] .patient-svg-wrap { height: 155px; }
+  html[data-screen-mode="6inch"] .action-bar { flex-direction: column; }
+
+  /* ③ 10インチ（タブレット）モード選択時のスタイル */
+  html[data-screen-mode="10inch"],
+  html[data-screen-mode="10inch"] body {
+    font-size: 15.5px;
+  }
+  html[data-screen-mode="10inch"] .sim-wrapper {
+    max-width: 920px;
+  }
+  html[data-screen-mode="10inch"] .sim-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  html[data-screen-mode="10inch"] .controls-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  html[data-screen-mode="10inch"] .controls-grid > .ctrl-box:first-child {
+    grid-column: span 2;
+  }
+  html[data-screen-mode="10inch"] .vital-val { font-size: 1.2rem; }
+  html[data-screen-mode="10inch"] .canvas-container { height: 380px; }
+  html[data-screen-mode="10inch"] .patient-svg-wrap { height: 195px; }
+
+  /* ④ 22インチ（大型モニター）モード選択時のスタイル */
+  html[data-screen-mode="22inch"],
+  html[data-screen-mode="22inch"] body {
+    font-size: 17px;
+  }
+  html[data-screen-mode="22inch"] .sim-wrapper {
+    max-width: min(96vw, 1840px);
+    gap: 16px;
+  }
+  html[data-screen-mode="22inch"] .sim-grid {
+    grid-template-columns: 1.38fr 1fr;
+    gap: 18px;
+  }
+  html[data-screen-mode="22inch"] .controls-grid {
+    grid-template-columns: 1.5fr 1.3fr 1fr;
+  }
+  html[data-screen-mode="22inch"] .controls-grid > .ctrl-box:first-child {
+    grid-column: span 1;
+  }
+  html[data-screen-mode="22inch"] .vital-val { font-size: 1.4rem; }
+  html[data-screen-mode="22inch"] .canvas-container { height: 520px; }
+  html[data-screen-mode="22inch"] .patient-svg-wrap { height: 225px; }
+</style>
+
+<script>
+  (function setupScreenSizeSelector() {
+    const wrapper = document.querySelector(".sim-wrapper");
+    const header = document.querySelector(".sim-header");
+    if (!wrapper || !header) return;
+
+    // 1. 画面上部に常設するサイズ切替バーを作成
+    const sizeBar = document.createElement("div");
+    sizeBar.className = "screen-size-bar";
+    sizeBar.innerHTML = `
+      <div class="screen-size-title">
+        <span>📐 画面サイズ表示モード:</span>
+        <button type="button" id="openSizeModalBtn" class="ss-btn" style="background:#334155;color:#fff;">選択画面を開く</button>
+      </div>
+      <div class="screen-size-btns" id="screenSizeBtnGroup">
+        <button type="button" class="ss-btn active" data-size="auto">🔄 自動判定</button>
+        <button type="button" class="ss-btn" data-size="6inch">📱 6インチ (スマホ)</button>
+        <button type="button" class="ss-btn" data-size="10inch">📟 10インチ (タブレット)</button>
+        <button type="button" class="ss-btn" data-size="22inch">🖥️ 22インチ (大画面)</button>
+      </div>
+    `;
+    wrapper.insertBefore(sizeBar, header);
+
+    // 2. 起動時の画面サイズ選択モーダルを作成
+    const modal = document.createElement("div");
+    modal.id = "screenSizeModal";
+    modal.className = "ss-modal-backdrop";
+    modal.innerHTML = `
+      <div class="ss-modal-card">
+        <div class="ss-modal-header">📐 画面サイズを選択してください</div>
+        <div class="ss-modal-sub">お使いの端末に合わせて、文字・波形モニター・回路図の大きさを最適化します（上部バーからいつでも変更できます）</div>
+        <div class="ss-modal-grid">
+          <button type="button" class="ss-choice-card" data-choose="6inch">
+            <span class="ss-choice-icon">📱</span>
+            <span class="ss-choice-name">6インチ クラス</span>
+            <span class="ss-choice-desc">スマートフォン向け<br>縦1列・コンパクト文字＆波形</span>
+          </button>
+          <button type="button" class="ss-choice-card" data-choose="10inch">
+            <span class="ss-choice-icon">📟</span>
+            <span class="ss-choice-name">10インチ クラス</span>
+            <span class="ss-choice-desc">iPad・タブレット向け<br>中サイズ文字＆広めの波形</span>
+          </button>
+          <button type="button" class="ss-choice-card" data-choose="22inch">
+            <span class="ss-choice-icon">🖥️</span>
+            <span class="ss-choice-name">22インチ クラス</span>
+            <span class="ss-choice-desc">PC・大型モニター向け<br>左右2列・大文字＆大型波形</span>
+          </button>
+          <button type="button" class="ss-choice-card" data-choose="auto">
+            <span class="ss-choice-icon">🔄</span>
+            <span class="ss-choice-name">自動調整モード</span>
+            <span class="ss-choice-desc">現在のウィンドウ幅を検知して<br>自動でサイズを切り替え</span>
+          </button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    // 3. 画面サイズ適用関数
+    function applyScreenSizeMode(mode) {
+      document.documentElement.setAttribute("data-screen-mode", mode);
+      document.querySelectorAll("#screenSizeBtnGroup .ss-btn").forEach(btn => {
+        btn.classList.toggle("active", btn.getAttribute("data-size") === mode);
+      });
+      modal.classList.add("hidden");
+      setTimeout(resizeCanvasSafely, 50);
+    }
+
+    // イベント登録
+    document.querySelectorAll("#screenSizeBtnGroup .ss-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        applyScreenSizeMode(btn.getAttribute("data-size") || "auto");
+      });
+    });
+
+    document.querySelectorAll("#screenSizeModal .ss-choice-card").forEach(card => {
+      card.addEventListener("click", () => {
+        applyScreenSizeMode(card.getAttribute("data-choose") || "auto");
+      });
+    });
+
+    const openBtn = document.getElementById("openSizeModalBtn");
+    if (openBtn) {
+      openBtn.addEventListener("click", () => {
+        modal.classList.remove("hidden");
+      });
+    }
+
+    // 初期状態は auto をセットしつつ、選択モーダルを表示
+    document.documentElement.setAttribute("data-screen-mode", "auto");
+  })();
+
+  /* 4. 波形モニター（Canvas）の中の文字・余白・線の太さも画面サイズに連動させる */
+  function drawAllGraphs(animType, W, H) {
+    if (!ctx) return;
+    ctx.clearRect(0, 0, W, H);
+
+    const scale = Math.max(0.82, Math.min(1.35, W / 680));
+    const labelFontPx = Math.round(11 * scale);
+    const axisFontPx = Math.max(8, Math.round(9.5 * scale));
+    const leftPad = Math.round(44 * scale);
+    const topMargin = Math.round(6 * scale);
+    const tH = (H - topMargin * 3.5) / 3;
+
+    const tracks = [
+      { label: "Paw (気道内圧)", unit: "cmH2O", top: topMargin, height: tH - 4, min: -10, max: 45, zeroVal: 0, color: "#facc15", key: "paw" },
+      { label: "Flow (流量)", unit: "L/min", top: tH + topMargin + 2, height: tH - 4, min: -90, max: 90, zeroVal: 0, color: "#38bdf8", key: "flow" },
+      { label: "Volume (換気量)", unit: "mL", top: tH * 2 + topMargin + 4, height: tH - 4, min: -50, max: 850, zeroVal: 0, color: "#4ade80", key: "vol" }
+    ];
+
+    const plotW = Math.max(100, W - leftPad - 10);
+    const timeWindow = 9.6;
+
+    tracks.forEach(tr => {
+      ctx.strokeStyle = "#1e293b";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(leftPad, tr.top, plotW, tr.height);
+
+      const zeroY = tr.top + tr.height - ((tr.zeroVal - tr.min) / (tr.max - tr.min)) * tr.height;
+      ctx.strokeStyle = "#475569";
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(leftPad, zeroY);
+      ctx.lineTo(leftPad + plotW, zeroY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = tr.color;
+      ctx.font = `bold ${labelFontPx}px sans-serif`;
+      ctx.fillText(`${tr.label} [${tr.unit}]`, leftPad + 6, tr.top + labelFontPx + 4);
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = `${axisFontPx}px monospace`;
+      ctx.fillText(tr.max, 4, tr.top + axisFontPx + 2);
+      ctx.fillText(tr.zeroVal, 8, zeroY + 3);
+      ctx.fillText(tr.min, 4, tr.top + tr.height - 2);
+
+      if (isNormalOverlay && !isResolved) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+        ctx.lineWidth = 2.2 * scale;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        for (let x = 0; x <= plotW; x += 2) {
+          const sampleTime = animTime - timeWindow + (x / plotW) * timeWindow;
+          const valObj = computeBreathWaveforms(Math.max(0, sampleTime), animType, true, currentMode, currentCtrl);
+          const val = valObj[tr.key];
+          const y = tr.top + tr.height - ((val - tr.min) / (tr.max - tr.min)) * tr.height;
+          const clampedY = Math.max(tr.top + 2, Math.min(tr.top + tr.height - 2, y));
+          if (x === 0) ctx.moveTo(leftPad + x, clampedY);
+          else ctx.lineTo(leftPad + x, clampedY);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.strokeStyle = tr.color;
+      ctx.lineWidth = 1.55 * scale;
+      ctx.beginPath();
+      for (let x = 0; x <= plotW; x += 1.5) {
+        const sampleTime = animTime - timeWindow + (x / plotW) * timeWindow;
+        const valObj = computeBreathWaveforms(Math.max(0, sampleTime), animType, isResolved, currentMode, currentCtrl);
+        const val = valObj[tr.key];
+        const y = tr.top + tr.height - ((val - tr.min) / (tr.max - tr.min)) * tr.height;
+        const clampedY = Math.max(tr.top + 2, Math.min(tr.top + tr.height - 2, y));
+        if (x === 0) ctx.moveTo(leftPad + x, clampedY);
+        else ctx.lineTo(leftPad + x, clampedY);
+      }
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  window.addEventListener("orientationchange", () => {
+    setTimeout(resizeCanvasSafely, 150);
+  });
+</script>
+<!-- ▲▲▲ 画面サイズ選択画面＆自動調整コードここまで ▲▲▲ -->
+</body>
+</html>
